@@ -1,0 +1,29 @@
+common:
+  batch_size: 64
+  epochs: 30
+  lr: 0.0001
+  weight_decay: 0.00001
+  patience: 5
+  amp: true
+  seed: 42
+  num_workers: 4
+  output_dir: outputs
+
+experiments:
+  M1_rgb:
+    mode: rgb
+    description: "RGB-only Relation + CE"
+
+  M2_freq:
+    mode: freq
+    description: "Freq-only Relation + CE"
+
+  M3_dual:
+    mode: dual
+    description: "RGB+Freq Relation + CE"
+
+  M4_dual_cl:
+    mode: dual_cl
+    description: "RGB+Freq Relation + CE + InfoNCE"
+    tau: 0.07
+    lambda_nce: 0.1

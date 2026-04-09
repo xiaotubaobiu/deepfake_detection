@@ -22,7 +22,9 @@ def train_one_epoch(model, dataloader, optimizer, scaler, device, args, contrast
     total_nce_loss = 0
     n_batches = 0
 
-    criterion = nn.CrossEntropyLoss()
+    # Weighted CE: real is ~1/14 of data, give it higher weight
+    class_weights = torch.tensor([13.0, 1.0]).to(device)
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
 
     for batch in dataloader:
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
@@ -137,6 +139,7 @@ def main():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--output_dir', type=str, default='outputs')
     parser.add_argument('--num_workers', type=int, default=4)
+    parser.add_argument('--gpus', type=str, default='0,1,2,3,4,5,6,7', help='GPU ids to use')
     args = parser.parse_args()
 
     if args.no_amp:
@@ -146,12 +149,18 @@ def main():
     np.random.seed(args.seed)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f'Device: {device}, Mode: {args.mode}')
 
-    train_loader = get_dataloader('train', batch_size=args.batch_size, num_workers=args.num_workers)
-    val_loader = get_dataloader('val', batch_size=args.batch_size, num_workers=args.num_workers)
+    # Multi-GPU setup
+    gpu_ids = [int(x) for x in args.gpus.split(',')]
+    n_gpus = len(gpu_ids)
+    print(f'Device: cuda, Mode: {args.mode}, GPUs: {gpu_ids} ({n_gpus} cards)')
+
+    train_loader = get_dataloader('train', batch_size=args.batch_size * n_gpus, num_workers=args.num_workers)
+    val_loader = get_dataloader('val', batch_size=args.batch_size * n_gpus, num_workers=args.num_workers)
 
     model = DualDomainDetector(mode=args.mode, pretrained=True).to(device)
+    if n_gpus > 1:
+        model = nn.DataParallel(model, device_ids=gpu_ids)
 
     optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs)
@@ -184,7 +193,7 @@ def main():
             os.makedirs(save_dir, exist_ok=True)
             torch.save({
                 'epoch': epoch,
-                'model_state_dict': model.state_dict(),
+                'model_state_dict': model.module.state_dict() if hasattr(model, 'module') else model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'auc': val_metrics['auc'],
                 'eer': val_metrics['eer'],

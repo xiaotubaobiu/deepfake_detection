@@ -23,6 +23,7 @@ for MODE in rgb freq dual dual_cl; do
         --lr 1e-4 \
         --patience 5 \
         --seed 42 \
+        --gpus 0,1,2,3,4,5,6,7 \
         --output_dir "$PROJECT_DIR/outputs"
 
     CKPT="$PROJECT_DIR/outputs/M4_${MODE}/best_model.pth"

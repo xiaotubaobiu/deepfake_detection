@@ -1,0 +1,7 @@
+_base_: configs/base.yaml
+experiment_name: exp1_efficientnet
+model:
+  name: efficientnet_b0
+  clip_model_name: ViT-B/16
+loss:
+  name: cross_entropy

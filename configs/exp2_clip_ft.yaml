@@ -1,0 +1,7 @@
+_base_: configs/base.yaml
+experiment_name: exp2_clip_ft
+model:
+  name: clip_finetune
+  clip_model_name: ViT-B/16
+loss:
+  name: cross_entropy

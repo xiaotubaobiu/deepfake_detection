@@ -1,0 +1,26 @@
+name: deepfake-detection
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pytorch=2.2
+  - torchvision=0.17
+  - pytorch-cuda=12.1
+  - numpy
+  - scipy
+  - scikit-learn
+  - pyyaml
+  - pillow
+  - opencv
+  - tqdm
+  - pandas
+  - pip:
+      - albumentations==1.4.18
+      - ftfy
+      - regex
+      - git+https://github.com/openai/CLIP.git
+      - pytest

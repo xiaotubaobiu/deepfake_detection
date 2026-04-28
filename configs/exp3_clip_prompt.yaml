@@ -1,0 +1,8 @@
+_base_: configs/base.yaml
+experiment_name: exp3_clip_prompt
+model:
+  name: clip_prompt
+  clip_model_name: ViT-B/16
+  prompt_mode: fixed
+loss:
+  name: cross_entropy

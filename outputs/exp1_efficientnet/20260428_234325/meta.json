@@ -1,0 +1,22 @@
+{
+  "experiment_name": "exp1_efficientnet",
+  "start_time": "20260428_234325",
+  "config_file": "N/A",
+  "model": "efficientnet_b0",
+  "per_gpu_batch": 64,
+  "epochs": 30,
+  "lr": 0.0001,
+  "loss": "cross_entropy",
+  "end_time": "20260428_235538",
+  "best_epoch": 9,
+  "best_val_auc": 1.0,
+  "final_val_auc": 1.0,
+  "final_val_eer": 0.0,
+  "final_val_acc": 1.0,
+  "ffpp_test_auc": 0.9995276266819352,
+  "ffpp_test_eer": 0.0015030060120240218,
+  "ffpp_test_acc": 0.9973637961335676,
+  "cdf_test_auc": 1.0,
+  "cdf_test_eer": 0.0,
+  "cdf_test_acc": 1.0
+}

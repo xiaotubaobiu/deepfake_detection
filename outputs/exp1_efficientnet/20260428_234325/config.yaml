@@ -1,0 +1,40 @@
+augment:
+  brightness_contrast_p: 0.5
+  brightness_limit: 0.1
+  compression_p: 0.2
+  compression_quality_lower: 40
+  compression_quality_upper: 100
+  contrast_limit: 0.1
+  horizontal_flip_p: 0.5
+  rotate_limit: 10
+  rotate_p: 0.5
+dataset:
+  frames_per_video: 8
+  image_size: 224
+  methods: []
+  real_sampling: oversample_per_method
+  root: /Dataset/deepfake_detection/DF40_all
+  train_videos_per_method: 200
+  use_mask: false
+  val_videos_per_method: 100
+experiment_name: exp1_efficientnet
+loss:
+  name: cross_entropy
+model:
+  clip_model_name: ViT-B/16
+  name: efficientnet_b0
+train:
+  distributed: ddp
+  epochs: 30
+  gpus_per_node: 8
+  image_size: 224
+  launcher: torchrun
+  lr: 0.0001
+  num_nodes: 1
+  num_workers: 8
+  output_dir: outputs
+  patience: 5
+  per_gpu_batch: 64
+  precision: amp
+  seed: 42
+  weight_decay: 1.0e-05

@@ -1,9 +1,9 @@
 dataset:
-  ffpp_root: /Dataset/deepfake_detection/FaceForensics++
-  cdf_root: /Dataset/deepfake_detection/DF40_all
+  root: /Dataset/deepfake_detection/DF40_all
   methods: []
   train_videos_per_method: 200
   frames_per_video: 8
+  val_videos_per_method: 100
   image_size: 224
   real_sampling: oversample_per_method
   use_mask: false
@@ -23,6 +23,14 @@ train:
   launcher: torchrun
   distributed: ddp
   image_size: 224
+  per_gpu_batch: 64
+  num_workers: 8
+  epochs: 30
+  lr: 0.0001
+  weight_decay: 0.00001
+  patience: 5
+  seed: 42
+  output_dir: outputs
   num_nodes: 1
   gpus_per_node: 8
   precision: amp

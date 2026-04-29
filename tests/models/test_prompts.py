@@ -1,3 +1,5 @@
+import torch
+
 from deepfake_detection.data.constants import REAL_PROMPTS, FAKE_PROMPTS
 
 
@@ -15,9 +17,6 @@ def test_prompt_counts():
     assert len(FAKE_PROMPTS) == 3
 
 
-import torch
-
-
 def test_clip_prompt_forward_returns_tuple_of_logits():
     from deepfake_detection.models.clip_prompt import CLIPPromptBinaryClassifier
     model = CLIPPromptBinaryClassifier()
@@ -27,7 +26,7 @@ def test_clip_prompt_forward_returns_tuple_of_logits():
     assert prompt_logits.shape == (2, 2)
 
 
-def test_clip_prompt_text_encoder_is_frozen():
+def test_clip_prompt_prompt_features_are_frozen_buffers():
     from deepfake_detection.models.clip_prompt import CLIPPromptBinaryClassifier
     model = CLIPPromptBinaryClassifier()
     assert not hasattr(model, "clip_model"), "clip_model should not be kept"

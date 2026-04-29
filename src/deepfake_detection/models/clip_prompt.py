@@ -36,7 +36,7 @@ class CLIPPromptBinaryClassifier(nn.Module):
         # 分类头
         self.classifier = nn.Linear(self.visual.output_dim, 2)
 
-        # 温度参数
+        # 温度参数（固定，不可训练，随模型保存/迁移）
         self.register_buffer("tau", torch.tensor(tau))
 
     def forward(self, images):

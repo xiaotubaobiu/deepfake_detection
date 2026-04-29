@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader, DistributedSampler
 
@@ -11,7 +12,14 @@ from deepfake_detection.data.index_ffpp import (
     index_train_aligned_triplets,
 )
 from deepfake_detection.data.sampling import sample_uniform_frame_indices
-from deepfake_detection.data.datasets import FrameClassificationDataset, AlignedTripletDataset
+from deepfake_detection.data.datasets import FrameClassificationDataset, AlignedTripletDataset, BgFaceTripletDataset
+
+
+def _worker_init_fn(worker_id):
+    """每个 DataLoader worker 用独立但确定的种子初始化随机状态。"""
+    seed = torch.initial_seed() % (2**32)
+    random.seed(seed + worker_id)
+    np.random.seed(seed + worker_id)
 
 
 def _get_normalization(cfg):
@@ -93,7 +101,8 @@ def build_train_loader(cfg, distributed=True):
 
     sampler = DistributedSampler(dataset, shuffle=True) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
-                      shuffle=(sampler is None), num_workers=num_workers, pin_memory=True, drop_last=True)
+                      shuffle=(sampler is None), num_workers=num_workers, pin_memory=True,
+                      drop_last=True, worker_init_fn=_worker_init_fn)
 
 
 def build_eval_loader(cfg, domain="ffpp", distributed=True):
@@ -123,7 +132,8 @@ def build_eval_loader(cfg, domain="ffpp", distributed=True):
                                         normalize_mean=norm_mean, normalize_std=norm_std)
     sampler = DistributedSampler(dataset, shuffle=False) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
-                      shuffle=False, num_workers=num_workers, pin_memory=True)
+                      shuffle=False, num_workers=num_workers, pin_memory=True,
+                      worker_init_fn=_worker_init_fn)
 
 
 def build_val_loader(cfg, distributed=True):
@@ -163,4 +173,31 @@ def build_val_loader(cfg, distributed=True):
                                         normalize_mean=norm_mean, normalize_std=norm_std)
     sampler = DistributedSampler(dataset, shuffle=False) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
-                      shuffle=False, num_workers=num_workers, pin_memory=True)
+                      shuffle=False, num_workers=num_workers, pin_memory=True,
+                      worker_init_fn=_worker_init_fn)
+
+
+def build_bgface_train_loader(cfg, distributed=True):
+    root = cfg["dataset"]["root"]
+    methods = cfg["dataset"].get("methods") or ALL_METHODS
+    max_videos = cfg["dataset"]["train_videos_per_method"]
+    batch_size = cfg["train"].get("per_gpu_batch", 32)
+    num_workers = cfg["train"].get("num_workers", 4)
+    num_bg_patches = cfg.get("loss", {}).get("num_bg_patches", 4)
+    from deepfake_detection.data.constants import CLIP_MEAN, CLIP_STD
+
+    all_triplets = []
+    for method in methods:
+        triplets = index_train_aligned_triplets(root, method, max_videos)
+        all_triplets.extend(triplets)
+
+    dataset = BgFaceTripletDataset(
+        all_triplets, augment=True,
+        num_bg_patches=num_bg_patches,
+        normalize_mean=CLIP_MEAN, normalize_std=CLIP_STD,
+    )
+    sampler = DistributedSampler(dataset, shuffle=True) if distributed else None
+    return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
+                      shuffle=(sampler is None), num_workers=num_workers,
+                      pin_memory=True, drop_last=True,
+                      worker_init_fn=_worker_init_fn)

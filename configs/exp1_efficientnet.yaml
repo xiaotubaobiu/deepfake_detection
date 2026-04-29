@@ -5,3 +5,5 @@ model:
   clip_model_name: ViT-B/16
 loss:
   name: cross_entropy
+train:
+  lr: 0.0005

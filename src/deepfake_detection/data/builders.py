@@ -14,6 +14,14 @@ from deepfake_detection.data.sampling import sample_uniform_frame_indices
 from deepfake_detection.data.datasets import FrameClassificationDataset, AlignedTripletDataset
 
 
+def _get_normalization(cfg):
+    model_name = cfg.get("model", {}).get("name", "")
+    if "clip" in model_name:
+        from deepfake_detection.data.transforms import CLIP_MEAN, CLIP_STD
+        return CLIP_MEAN, CLIP_STD
+    return None, None
+
+
 def _subsample_records_to_frames(records, frames_per_video=8):
     from collections import defaultdict
     by_video: dict[str, list] = defaultdict(list)
@@ -50,6 +58,7 @@ def build_train_loader(cfg, distributed=True):
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
     require_triplets = cfg.get("data", {}).get("require_aligned_triplets", False)
+    norm_mean, norm_std = _get_normalization(cfg)
 
     if require_triplets:
         all_triplets = []
@@ -79,7 +88,8 @@ def build_train_loader(cfg, distributed=True):
             real_balanced.extend(rng.sample(real_by_video, min(len(real_by_video), target_real_count - len(real_balanced))))
 
         all_records = real_balanced[:target_real_count] + fake_by_video
-        dataset = FrameClassificationDataset(all_records, augment=True)
+        dataset = FrameClassificationDataset(all_records, augment=True,
+                                            normalize_mean=norm_mean, normalize_std=norm_std)
 
     sampler = DistributedSampler(dataset, shuffle=True) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
@@ -91,6 +101,7 @@ def build_eval_loader(cfg, domain="ffpp", distributed=True):
     methods = cfg["dataset"].get("methods") or ALL_METHODS
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
+    norm_mean, norm_std = _get_normalization(cfg)
 
     test_domain = "ff" if domain == "ffpp" else "cdf"
 
@@ -108,7 +119,8 @@ def build_eval_loader(cfg, domain="ffpp", distributed=True):
         fake_records.extend(recs)
 
     all_records = real_deduped + fake_records
-    dataset = FrameClassificationDataset(all_records, augment=False)
+    dataset = FrameClassificationDataset(all_records, augment=False,
+                                        normalize_mean=norm_mean, normalize_std=norm_std)
     sampler = DistributedSampler(dataset, shuffle=False) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
                       shuffle=False, num_workers=num_workers, pin_memory=True)
@@ -121,6 +133,7 @@ def build_val_loader(cfg, distributed=True):
     frames_per_video = cfg["dataset"]["frames_per_video"]
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
+    norm_mean, norm_std = _get_normalization(cfg)
 
     # Val fake: videos [max_videos : max_videos + val_videos] per method
     max_videos = cfg["dataset"]["train_videos_per_method"]
@@ -146,7 +159,8 @@ def build_val_loader(cfg, distributed=True):
         real_balanced.extend(rng.sample(real_by_video, min(len(real_by_video), target_real_count - len(real_balanced))))
 
     all_records = real_balanced[:target_real_count] + fake_by_video
-    dataset = FrameClassificationDataset(all_records, augment=False)
+    dataset = FrameClassificationDataset(all_records, augment=False,
+                                        normalize_mean=norm_mean, normalize_std=norm_std)
     sampler = DistributedSampler(dataset, shuffle=False) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
                       shuffle=False, num_workers=num_workers, pin_memory=True)

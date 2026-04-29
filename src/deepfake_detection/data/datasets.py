@@ -96,3 +96,66 @@ class AlignedTripletDataset(Dataset):
             "label": torch.tensor(FAKE_LABEL, dtype=torch.long),
             "video_id": t["pair_id"],
         }
+
+
+class BgFaceTripletDataset(Dataset):
+    def __init__(self, triplets, augment=False, img_size=224, num_bg_patches=4,
+                 normalize_mean=None, normalize_std=None):
+        self.triplets = triplets
+        self.augment = augment
+        self.img_size = img_size
+        self.num_bg_patches = num_bg_patches
+        mean = normalize_mean or (0.485, 0.456, 0.406)
+        std = normalize_std or (0.229, 0.224, 0.225)
+        self.transform = build_rgb_augment(mean=mean, std=std) if augment else build_eval_transform(mean=mean, std=std)
+
+    def __len__(self):
+        return len(self.triplets)
+
+    def __getitem__(self, idx):
+        import random as _random
+        from deepfake_detection.data.bg_patches import sample_bg_patches
+
+        t = self.triplets[idx]
+
+        anchor_img = _load_frame(t["real_frame_path"])
+        fake_img = _load_frame(t["fake_frame_path"])
+
+        face_box = None
+        if t.get("fake_landmark_path"):
+            try:
+                face_box = _detect_face_box(anchor_img, t["fake_landmark_path"])
+            except Exception:
+                pass
+
+        if face_box is not None:
+            fx1, fy1, fx2, fy2 = expand_box(face_box, 1.5, anchor_img.shape[0], anchor_img.shape[1])
+            real_face_crop = crop_region(anchor_img, (fx1, fy1, fx2, fy2), self.img_size)
+        else:
+            real_face_crop = cv2_resize(anchor_img, self.img_size)
+
+        fake_resized = cv2_resize(fake_img, self.img_size)
+
+        rng = _random.Random()
+        bg_patches_raw = sample_bg_patches(
+            anchor_img, num_patches=self.num_bg_patches,
+            patch_size=self.img_size, face_box=face_box, rng=rng,
+        )
+
+        real_face_transformed = self.transform(image=real_face_crop)["image"]
+        fake_transformed = self.transform(image=fake_resized)["image"]
+        bg_tensors = [self.transform(image=bp)["image"] for bp in bg_patches_raw]
+
+        real_tensor = torch.from_numpy(real_face_transformed).permute(2, 0, 1).float() / 255.0
+        fake_tensor = torch.from_numpy(fake_transformed).permute(2, 0, 1).float() / 255.0
+        bg_stacked = torch.stack([
+            torch.from_numpy(bt).permute(2, 0, 1).float() / 255.0 for bt in bg_tensors
+        ])
+
+        return {
+            "background": bg_stacked,
+            "real_face": real_tensor,
+            "fake_face": fake_tensor,
+            "label": torch.tensor(1, dtype=torch.long),
+            "video_id": t["pair_id"],
+        }

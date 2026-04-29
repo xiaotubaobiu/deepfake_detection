@@ -11,5 +11,13 @@ REENACTMENT_METHODS = [
 ALL_METHODS = FACE_SWAP_METHODS + REENACTMENT_METHODS
 REAL_LABEL = 0
 FAKE_LABEL = 1
-REAL_PROMPTS = ["a real face image", "an authentic face photo"]
-FAKE_PROMPTS = ["a fake face image", "a manipulated face photo"]
+REAL_PROMPTS = [
+    "a real human face photo",
+    "an authentic face image",
+    "a natural face without manipulation",
+]
+FAKE_PROMPTS = [
+    "a fake face photo",
+    "a manipulated face image",
+    "a deepfake face image",
+]

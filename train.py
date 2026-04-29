@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import time
 from datetime import datetime
 
@@ -89,8 +90,15 @@ def main():
 
     local_rank = init_ddp()
     device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
-    torch.manual_seed(seed)
+
+    # ---- 全局确定性种子 ----
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
     np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     logger = None
     if is_main_process():
@@ -109,7 +117,12 @@ def main():
     scheduler = CosineAnnealingLR(optimizer, T_max=epochs)
     scaler = torch.cuda.amp.GradScaler(enabled=True)
 
-    train_loader = build_train_loader(cfg, distributed=torch.distributed.is_initialized())
+    loss_name = cfg.get("loss", {}).get("name", "")
+    if loss_name == "cross_entropy_plus_bgface_contrast":
+        from deepfake_detection.data.builders import build_bgface_train_loader
+        train_loader = build_bgface_train_loader(cfg, distributed=torch.distributed.is_initialized())
+    else:
+        train_loader = build_train_loader(cfg, distributed=torch.distributed.is_initialized())
     val_loader = build_val_loader(cfg, distributed=torch.distributed.is_initialized())
     ffpp_eval_loader = build_eval_loader(cfg, domain="ffpp", distributed=torch.distributed.is_initialized())
     cdf_eval_loader = build_eval_loader(cfg, domain="cdf", distributed=torch.distributed.is_initialized())

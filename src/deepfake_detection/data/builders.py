@@ -28,12 +28,16 @@ def _subsample_records_to_frames(records, frames_per_video=8):
     return result
 
 
-def _deduplicate_by_pair_id(records):
+def _deduplicate_videos(records):
+    """Keep all frames for each unique pair_id from first-encountered method."""
     seen = set()
+    claimed_by = {}
     result = []
     for r in records:
         if r.pair_id not in seen:
             seen.add(r.pair_id)
+            claimed_by[r.pair_id] = r.method
+        if claimed_by.get(r.pair_id) == r.method:
             result.append(r)
     return result
 
@@ -66,7 +70,7 @@ def build_train_loader(cfg, distributed=True):
         for method in methods:
             recs = load_json_index(root, method, "ff", "train", 0, max_videos=max_videos)
             real_records.extend(recs)
-        real_deduped = _deduplicate_by_pair_id(real_records)
+        real_deduped = _deduplicate_videos(real_records)
         real_by_video = _subsample_records_to_frames(real_deduped, frames_per_video)
         target_real_count = len(fake_by_video)
         rng = random.Random(42)
@@ -95,7 +99,7 @@ def build_eval_loader(cfg, domain="ffpp", distributed=True):
     for method in methods:
         recs = load_json_index(root, method, test_domain, "test", 0)
         real_records.extend(recs)
-    real_deduped = _deduplicate_by_pair_id(real_records)
+    real_deduped = _deduplicate_videos(real_records)
 
     # Fake: from JSON test split
     fake_records = []
@@ -133,7 +137,7 @@ def build_val_loader(cfg, distributed=True):
         recs = load_json_index(root, method, "ff", "train", 0,
                                video_range=(max_videos, max_videos + val_videos))
         real_records.extend(recs)
-    real_deduped = _deduplicate_by_pair_id(real_records)
+    real_deduped = _deduplicate_videos(real_records)
     real_by_video = _subsample_records_to_frames(real_deduped, frames_per_video)
     target_real_count = len(fake_by_video)
     rng = random.Random(42)

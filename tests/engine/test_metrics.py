@@ -1,4 +1,6 @@
 import numpy as np
+import torch
+import torch.nn as nn
 from deepfake_detection.engine.metrics import mean_video_score, compute_auc, compute_eer, compute_acc, aggregate_video_predictions
 
 
@@ -22,3 +24,28 @@ def test_aggregate_video_predictions():
     labels, scores = aggregate_video_predictions(rows)
     assert len(labels) == 2
     assert len(scores) == 2
+
+
+class _FakePromptModel(nn.Module):
+    """用于测试 prompt_contrast_step 的 mock 模型"""
+    def __init__(self):
+        super().__init__()
+        self.linear = nn.Linear(10, 2)
+    def forward(self, images):
+        cls_logits = self.linear(images.mean(dim=[1, 2, 3]).unsqueeze(1).expand(-1, 10))
+        prompt_logits = cls_logits * 2.0
+        return cls_logits, prompt_logits
+
+
+def test_prompt_contrast_step_returns_total_loss_and_logits():
+    from deepfake_detection.engine.trainers import prompt_contrast_step
+    model = _FakePromptModel()
+    batch = {
+        "image": torch.randn(4, 3, 32, 32),
+        "label": torch.tensor([0, 1, 0, 1]),
+    }
+    total_loss, cls_logits, prompt_logits = prompt_contrast_step(model, batch, "cpu", beta=0.1)
+    assert total_loss.ndim == 0
+    assert cls_logits.shape == (4, 2)
+    assert prompt_logits.shape == (4, 2)
+    assert total_loss.item() > 0

@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.amp import GradScaler, autocast
+from torch.cuda.amp import GradScaler, autocast
 
 from deepfake_detection.engine.metrics import compute_auc, compute_eer, compute_acc, aggregate_video_predictions
 
@@ -30,18 +30,33 @@ def contrastive_step(model, batch, device, lambda_align=0.1, temperature=0.07):
     return total_loss, cls_logits
 
 
+def prompt_contrast_step(model, batch, device, beta=0.1):
+    images = batch["image"].to(device)
+    labels = batch["label"].to(device)
+    cls_logits, prompt_logits = model(images)
+    cls_loss = F.cross_entropy(cls_logits, labels)
+    prompt_loss = F.cross_entropy(prompt_logits, labels)
+    total_loss = cls_loss + beta * prompt_loss
+    return total_loss, cls_logits, prompt_logits
+
+
 def run_train_epoch(model, dataloader, optimizer, scaler, device, cfg):
     model.train()
     total_loss = 0
     n = 0
-    is_contrastive = cfg.get("loss", {}).get("name") == "cross_entropy_plus_contrastive"
+    loss_name = cfg.get("loss", {}).get("name", "")
+    is_contrastive = loss_name == "cross_entropy_plus_contrastive"
+    is_prompt = loss_name == "cross_entropy_plus_prompt"
     lambda_align = cfg.get("loss", {}).get("lambda_align", 0.1)
     temperature = cfg.get("loss", {}).get("temperature", 0.07)
+    beta = cfg.get("loss", {}).get("beta", 0.1)
     for batch in dataloader:
         optimizer.zero_grad()
-        with autocast(device_type="cuda", enabled=True):
+        with autocast(enabled=True):
             if is_contrastive:
                 loss, _ = contrastive_step(model, batch, device, lambda_align, temperature)
+            elif is_prompt:
+                loss, _, _ = prompt_contrast_step(model, batch, device, beta)
             else:
                 loss, _ = classification_step(model, batch, device)
         scaler.scale(loss).backward()
@@ -58,14 +73,24 @@ def run_train_epoch(model, dataloader, optimizer, scaler, device, cfg):
 def run_eval_epoch(model, dataloader, device, cfg):
     model.eval()
     all_rows = []
-    is_contrastive = cfg.get("loss", {}).get("name") == "cross_entropy_plus_contrastive"
+    loss_name = cfg.get("loss", {}).get("name", "")
+    is_contrastive = loss_name == "cross_entropy_plus_contrastive"
+    is_prompt = loss_name == "cross_entropy_plus_prompt"
+    alpha = cfg.get("loss", {}).get("alpha", 0.3)
     for batch in dataloader:
         images = batch["image"].to(device) if not is_contrastive else batch["background"].to(device)
         labels = batch["label"]
         video_ids = batch["video_id"]
-        with autocast(device_type="cuda", enabled=True):
-            logits = model(images)
-        probs = torch.softmax(logits, dim=1)[:, 1].cpu().numpy()
+        with autocast(enabled=True):
+            output = model(images)
+        if is_prompt:
+            cls_logits, prompt_logits = output
+            cls_prob = torch.softmax(cls_logits, dim=1)[:, 1]
+            prompt_prob = torch.softmax(prompt_logits, dim=1)[:, 1]
+            probs = ((1 - alpha) * cls_prob + alpha * prompt_prob).cpu().numpy()
+        else:
+            logits = output
+            probs = torch.softmax(logits, dim=1)[:, 1].cpu().numpy()
         for i in range(len(probs)):
             all_rows.append({
                 "video_id": video_ids[i] if isinstance(video_ids, list) else video_ids[i],

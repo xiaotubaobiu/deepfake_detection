@@ -40,6 +40,24 @@ def prompt_contrast_step(model, batch, device, beta=0.1):
     return total_loss, cls_logits, prompt_logits
 
 
+def bgface_contrast_step(model, batch, device, lambda_align=0.1, temperature=0.07):
+    bg_images = batch["background"].to(device)
+    real_face = batch["real_face"].to(device)
+    fake_face = batch["fake_face"].to(device)
+    labels = batch["label"].to(device)
+
+    cls_logits = model.forward_classification(fake_face)
+    cls_loss = F.cross_entropy(cls_logits, labels)
+
+    from deepfake_detection.losses.contrastive import infonce_bg_face_loss
+    bg_proj, real_face_proj = model.forward_contrastive(bg_images, real_face)
+    _, fake_face_proj = model.forward_contrastive(bg_images, fake_face)
+    contrastive_loss = infonce_bg_face_loss(bg_proj, real_face_proj, fake_face_proj, temperature)
+
+    total_loss = cls_loss + lambda_align * contrastive_loss
+    return total_loss, cls_logits
+
+
 def run_train_epoch(model, dataloader, optimizer, scaler, device, cfg):
     model.train()
     total_loss = 0
@@ -47,6 +65,7 @@ def run_train_epoch(model, dataloader, optimizer, scaler, device, cfg):
     loss_name = cfg.get("loss", {}).get("name", "")
     is_contrastive = loss_name == "cross_entropy_plus_contrastive"
     is_prompt = loss_name == "cross_entropy_plus_prompt"
+    is_bgface = loss_name == "cross_entropy_plus_bgface_contrast"
     lambda_align = cfg.get("loss", {}).get("lambda_align", 0.1)
     temperature = cfg.get("loss", {}).get("temperature", 0.07)
     beta = cfg.get("loss", {}).get("beta", 0.1)
@@ -57,6 +76,8 @@ def run_train_epoch(model, dataloader, optimizer, scaler, device, cfg):
                 loss, _ = contrastive_step(model, batch, device, lambda_align, temperature)
             elif is_prompt:
                 loss, _, _ = prompt_contrast_step(model, batch, device, beta)
+            elif is_bgface:
+                loss, _ = bgface_contrast_step(model, batch, device, lambda_align, temperature)
             else:
                 loss, _ = classification_step(model, batch, device)
         scaler.scale(loss).backward()

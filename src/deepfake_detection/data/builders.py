@@ -6,13 +6,9 @@ import torch
 from torch.utils.data import DataLoader, DistributedSampler
 
 from deepfake_detection.data.constants import ALL_METHODS
+from deepfake_detection.data.index_ffpp import load_json_index
 from deepfake_detection.data.index_ffpp import (
-    index_train_method_frames,
-    index_train_real_frames,
     index_train_aligned_triplets,
-    index_test_method_frames,
-    index_test_real_frames,
-    index_val_method_frames,
 )
 from deepfake_detection.data.sampling import sample_uniform_frame_indices
 from deepfake_detection.data.datasets import FrameClassificationDataset, AlignedTripletDataset
@@ -32,6 +28,16 @@ def _subsample_records_to_frames(records, frames_per_video=8):
     return result
 
 
+def _deduplicate_by_pair_id(records):
+    seen = set()
+    result = []
+    for r in records:
+        if r.pair_id not in seen:
+            seen.add(r.pair_id)
+            result.append(r)
+    return result
+
+
 def build_train_loader(cfg, distributed=True):
     root = cfg["dataset"]["root"]
     methods = cfg["dataset"].get("methods") or ALL_METHODS
@@ -48,21 +54,25 @@ def build_train_loader(cfg, distributed=True):
             all_triplets.extend(triplets)
         dataset = AlignedTripletDataset(all_triplets, augment=True)
     else:
-        # Collect fake records: 200 videos per method, subsample to 8 frames each
+        # Collect fake records from JSON: first max_videos per method
         fake_records = []
         for method in methods:
-            recs = index_train_method_frames(root, method, max_videos)
+            recs = load_json_index(root, method, "ff", "train", 1, max_videos=max_videos)
             fake_records.extend(recs)
         fake_by_video = _subsample_records_to_frames(fake_records, frames_per_video)
 
-        # Collect real records: oversample to match total fake count
-        real_records = index_train_real_frames(root)
-        real_by_video_full = _subsample_records_to_frames(real_records, frames_per_video)
+        # Collect real records from JSON: FF++ original, aligned range
+        real_records = []
+        for method in methods:
+            recs = load_json_index(root, method, "ff", "train", 0, max_videos=max_videos)
+            real_records.extend(recs)
+        real_deduped = _deduplicate_by_pair_id(real_records)
+        real_by_video = _subsample_records_to_frames(real_deduped, frames_per_video)
         target_real_count = len(fake_by_video)
         rng = random.Random(42)
         real_balanced = []
         while len(real_balanced) < target_real_count:
-            real_balanced.extend(rng.sample(real_by_video_full, min(len(real_by_video_full), target_real_count - len(real_balanced))))
+            real_balanced.extend(rng.sample(real_by_video, min(len(real_by_video), target_real_count - len(real_balanced))))
 
         all_records = real_balanced[:target_real_count] + fake_by_video
         dataset = FrameClassificationDataset(all_records, augment=True)
@@ -78,11 +88,22 @@ def build_eval_loader(cfg, domain="ffpp", distributed=True):
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
 
-    all_records = list(index_test_real_frames(root))
-    for method in methods:
-        test_domain = "ff" if domain == "ffpp" else "cdf"
-        all_records.extend(index_test_method_frames(root, method, test_domain))
+    test_domain = "ff" if domain == "ffpp" else "cdf"
 
+    # Real: from JSON test split (CDF JSON uses Celeb-DF-v2 real)
+    real_records = []
+    for method in methods:
+        recs = load_json_index(root, method, test_domain, "test", 0)
+        real_records.extend(recs)
+    real_deduped = _deduplicate_by_pair_id(real_records)
+
+    # Fake: from JSON test split
+    fake_records = []
+    for method in methods:
+        recs = load_json_index(root, method, test_domain, "test", 1)
+        fake_records.extend(recs)
+
+    all_records = real_deduped + fake_records
     dataset = FrameClassificationDataset(all_records, augment=False)
     sampler = DistributedSampler(dataset, shuffle=False) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
@@ -97,19 +118,28 @@ def build_val_loader(cfg, distributed=True):
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
 
+    # Val fake: videos [max_videos : max_videos + val_videos] per method
+    max_videos = cfg["dataset"]["train_videos_per_method"]
     fake_records = []
     for method in methods:
-        recs = index_val_method_frames(root, method, val_videos)
+        recs = load_json_index(root, method, "ff", "train", 1,
+                               video_range=(max_videos, max_videos + val_videos))
         fake_records.extend(recs)
     fake_by_video = _subsample_records_to_frames(fake_records, frames_per_video)
 
-    real_records = index_train_real_frames(root)
-    real_by_video_full = _subsample_records_to_frames(real_records, frames_per_video)
+    # Val real: FF++ original, same range — NO overlap with training real
+    real_records = []
+    for method in methods:
+        recs = load_json_index(root, method, "ff", "train", 0,
+                               video_range=(max_videos, max_videos + val_videos))
+        real_records.extend(recs)
+    real_deduped = _deduplicate_by_pair_id(real_records)
+    real_by_video = _subsample_records_to_frames(real_deduped, frames_per_video)
     target_real_count = len(fake_by_video)
     rng = random.Random(42)
     real_balanced = []
     while len(real_balanced) < target_real_count:
-        real_balanced.extend(rng.sample(real_by_video_full, min(len(real_by_video_full), target_real_count - len(real_balanced))))
+        real_balanced.extend(rng.sample(real_by_video, min(len(real_by_video), target_real_count - len(real_balanced))))
 
     all_records = real_balanced[:target_real_count] + fake_by_video
     dataset = FrameClassificationDataset(all_records, augment=False)

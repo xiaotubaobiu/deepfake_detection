@@ -40,14 +40,14 @@ class CLIPPromptBinaryClassifier(nn.Module):
         self.register_buffer("tau", torch.tensor(tau))
 
     def forward(self, images):
-        # 1. 视觉特征
-        image_features = self.visual(images)
-        image_features = F.normalize(image_features, dim=-1)
+        # 1. 视觉特征（原始，不归一化）
+        raw_features = self.visual(images)
 
-        # 2. 分类头 logits
-        cls_logits = self.classifier(image_features.float())
+        # 2. 分类头 logits（用原始特征，和 exp2 一致）
+        cls_logits = self.classifier(raw_features.float())
 
-        # 3. Prompt logits（温度缩放）
+        # 3. Prompt logits（归一化后做余弦相似度）
+        image_features = F.normalize(raw_features, dim=-1)
         real_sim = (image_features @ self._real_features.T).mean(dim=1, keepdim=True)
         fake_sim = (image_features @ self._fake_features.T).mean(dim=1, keepdim=True)
         prompt_logits = torch.cat([real_sim, fake_sim], dim=1) / self.tau

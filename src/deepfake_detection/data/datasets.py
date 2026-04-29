@@ -11,7 +11,7 @@ from deepfake_detection.data.constants import ALL_METHODS, IMG_SIZE, REAL_LABEL,
 from deepfake_detection.data.crops import crop_region, expand_box
 from deepfake_detection.data.frequency import rgb_to_frequency_map
 from deepfake_detection.data.sampling import sample_uniform_frame_indices
-from deepfake_detection.data.transforms import apply_shared_transform_pair, build_rgb_augment
+from deepfake_detection.data.transforms import apply_shared_transform_pair, build_rgb_augment, build_eval_transform
 
 
 def collate_video_scores(rows: list[dict]) -> dict[str, list[float]]:
@@ -46,7 +46,7 @@ class FrameClassificationDataset(Dataset):
         self.records = records
         self.augment = augment
         self.img_size = img_size
-        self.transform = build_rgb_augment() if augment else None
+        self.transform = build_rgb_augment() if augment else build_eval_transform()
 
     def __len__(self):
         return len(self.records)
@@ -54,11 +54,10 @@ class FrameClassificationDataset(Dataset):
     def __getitem__(self, idx):
         rec = self.records[idx]
         img = _load_frame(rec.frame_path)
-        if self.transform is not None:
-            img = self.transform(image=img)["image"]
         img = cv2_resize(img, self.img_size)
-        tensor = torch.from_numpy(img).permute(2, 0, 1).float() / 255.0
-        return {"image": tensor, "label": torch.tensor(rec.label, dtype=torch.long), "video_id": getattr(rec, 'pair_id', rec.video_id)}
+        img = self.transform(image=img)["image"]
+        tensor = torch.from_numpy(img).permute(2, 0, 1).float()
+        return {"image": tensor, "label": torch.tensor(rec.label, dtype=torch.long), "video_id": rec.pair_id if hasattr(rec, 'pair_id') else rec.video_id}
 
 
 def cv2_resize(img, size):

@@ -184,7 +184,7 @@ def build_bgface_train_loader(cfg, distributed=True):
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
     num_bg_patches = cfg.get("loss", {}).get("num_bg_patches", 4)
-    from deepfake_detection.data.constants import CLIP_MEAN, CLIP_STD
+    from deepfake_detection.data.transforms import CLIP_MEAN, CLIP_STD
 
     all_triplets = []
     for method in methods:

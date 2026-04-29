@@ -123,9 +123,11 @@ def index_train_aligned_triplets(root: str, method: str, max_videos: int | None 
                 real_index[(rec.pair_id, rec.frame_name)] = rec
 
     # --- match fake to real ---
+    # fake pair_id format: "001_870" (source_target), anchor id is "001"
     triplets = []
     for fake in fake_records:
-        key = (fake.pair_id, fake.frame_name)
+        source_id = fake.pair_id.split("_")[0]
+        key = (source_id, fake.frame_name)
         real = real_index.get(key)
         if real is not None:
             triplets.append({

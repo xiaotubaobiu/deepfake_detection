@@ -14,7 +14,8 @@ def build_model(model_cfg: dict):
     if name == "clip_finetune":
         return CLIPFineTuneBinaryClassifier(clip_name)
     if name == "clip_prompt":
-        return CLIPPromptBinaryClassifier(clip_name)
+        tau = model_cfg.get("tau", 0.07)
+        return CLIPPromptBinaryClassifier(clip_name, tau)
     if name == "clip_prompt_bgcontrast":
         proj_dim = model_cfg.get("projection_dim", 256)
         return CLIPBgFaceContrastModel(clip_name, proj_dim)

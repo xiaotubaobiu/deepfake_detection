@@ -42,13 +42,13 @@ def _detect_face_box(img: np.ndarray, landmark_path: str | None = None) -> tuple
 
 
 class FrameClassificationDataset(Dataset):
-    def __init__(self, records, augment=False, img_size=IMG_SIZE, normalize_mean=None, normalize_std=None):
+    def __init__(self, records, augment=False, img_size=IMG_SIZE, normalize_mean=None, normalize_std=None, seed=42):
         self.records = records
         self.augment = augment
         self.img_size = img_size
         mean = normalize_mean or (0.485, 0.456, 0.406)
         std = normalize_std or (0.229, 0.224, 0.225)
-        self.transform = build_rgb_augment(mean=mean, std=std) if augment else build_eval_transform(mean=mean, std=std)
+        self.transform = build_rgb_augment(mean=mean, std=std, seed=seed) if augment else build_eval_transform(mean=mean, std=std)
 
     def __len__(self):
         return len(self.records)

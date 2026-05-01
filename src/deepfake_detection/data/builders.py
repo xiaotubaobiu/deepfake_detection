@@ -65,6 +65,7 @@ def build_train_loader(cfg, distributed=True):
     frames_per_video = cfg["dataset"]["frames_per_video"]
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
+    seed = cfg["train"].get("seed", 42)
     require_triplets = cfg.get("data", {}).get("require_aligned_triplets", False)
     norm_mean, norm_std = _get_normalization(cfg)
 
@@ -97,12 +98,15 @@ def build_train_loader(cfg, distributed=True):
 
         all_records = real_balanced[:target_real_count] + fake_by_video
         dataset = FrameClassificationDataset(all_records, augment=True,
-                                            normalize_mean=norm_mean, normalize_std=norm_std)
+                                            normalize_mean=norm_mean, normalize_std=norm_std,
+                                            seed=seed)
 
-    sampler = DistributedSampler(dataset, shuffle=True) if distributed else None
+    g = torch.Generator()
+    g.manual_seed(seed)
+    sampler = DistributedSampler(dataset, shuffle=True, seed=seed) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
                       shuffle=(sampler is None), num_workers=num_workers, pin_memory=True,
-                      drop_last=True, worker_init_fn=_worker_init_fn)
+                      drop_last=True, worker_init_fn=_worker_init_fn, generator=g)
 
 
 def build_eval_loader(cfg, domain="ffpp", distributed=True):
@@ -110,6 +114,7 @@ def build_eval_loader(cfg, domain="ffpp", distributed=True):
     methods = cfg["dataset"].get("methods") or ALL_METHODS
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
+    seed = cfg["train"].get("seed", 42)
     norm_mean, norm_std = _get_normalization(cfg)
 
     test_domain = "ff" if domain == "ffpp" else "cdf"
@@ -129,11 +134,14 @@ def build_eval_loader(cfg, domain="ffpp", distributed=True):
 
     all_records = real_deduped + fake_records
     dataset = FrameClassificationDataset(all_records, augment=False,
-                                        normalize_mean=norm_mean, normalize_std=norm_std)
+                                        normalize_mean=norm_mean, normalize_std=norm_std,
+                                        seed=seed)
+    g = torch.Generator()
+    g.manual_seed(seed)
     sampler = DistributedSampler(dataset, shuffle=False) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
                       shuffle=False, num_workers=num_workers, pin_memory=True,
-                      worker_init_fn=_worker_init_fn)
+                      drop_last=False, worker_init_fn=_worker_init_fn, generator=g)
 
 
 def build_val_loader(cfg, distributed=True):
@@ -143,6 +151,7 @@ def build_val_loader(cfg, distributed=True):
     frames_per_video = cfg["dataset"]["frames_per_video"]
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
+    seed = cfg["train"].get("seed", 42)
     norm_mean, norm_std = _get_normalization(cfg)
 
     # Val fake: videos [max_videos : max_videos + val_videos] per method
@@ -170,11 +179,14 @@ def build_val_loader(cfg, distributed=True):
 
     all_records = real_balanced[:target_real_count] + fake_by_video
     dataset = FrameClassificationDataset(all_records, augment=False,
-                                        normalize_mean=norm_mean, normalize_std=norm_std)
+                                        normalize_mean=norm_mean, normalize_std=norm_std,
+                                        seed=seed)
+    g = torch.Generator()
+    g.manual_seed(seed)
     sampler = DistributedSampler(dataset, shuffle=False) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
                       shuffle=False, num_workers=num_workers, pin_memory=True,
-                      worker_init_fn=_worker_init_fn)
+                      drop_last=False, worker_init_fn=_worker_init_fn, generator=g)
 
 
 def build_bgface_train_loader(cfg, distributed=True):

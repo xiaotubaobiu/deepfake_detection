@@ -1,7 +1,0 @@
-Exp: exp1_efficientnet
-Model: efficientnet_b0
-Best epoch: 8
-Per-GPU batch: 256
-Val:  AUC=0.7308 EER=0.3336 ACC=0.6443
-FF++: AUC=0.7634 EER=0.3210 ACC=0.8629
-CDF:  AUC=0.6485 EER=0.3868 ACC=0.8829

@@ -8,7 +8,7 @@ CLIP_MEAN = (0.48145466, 0.45762756, 0.40821073)
 CLIP_STD = (0.26862954, 0.26130258, 0.27577711)
 
 
-def build_rgb_augment(mean=IMAGENET_MEAN, std=IMAGENET_STD) -> A.Compose:
+def build_rgb_augment(mean=IMAGENET_MEAN, std=IMAGENET_STD, seed=42) -> A.Compose:
     return A.Compose([
         A.HorizontalFlip(p=0.5),
         A.Rotate(limit=[-10, 10], p=0.5),
@@ -20,7 +20,7 @@ def build_rgb_augment(mean=IMAGENET_MEAN, std=IMAGENET_STD) -> A.Compose:
         ], p=0.5),
         A.ImageCompression(quality_range=(40, 100), p=0.5),
         A.Normalize(mean=mean, std=std),
-    ], additional_targets={"image_pair": "image"})
+    ], additional_targets={"image_pair": "image"}, seed=seed)
 
 
 def build_eval_transform(mean=IMAGENET_MEAN, std=IMAGENET_STD) -> A.Compose:

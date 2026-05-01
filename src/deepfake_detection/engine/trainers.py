@@ -58,7 +58,7 @@ def bgface_contrast_step(model, batch, device, lambda_align=0.1, temperature=0.0
     return total_loss, cls_logits
 
 
-def run_train_epoch(model, dataloader, optimizer, scaler, device, cfg):
+def run_train_epoch(model, dataloader, optimizer, scaler, device, cfg, ema=None):
     model.train()
     total_loss = 0
     n = 0
@@ -85,6 +85,8 @@ def run_train_epoch(model, dataloader, optimizer, scaler, device, cfg):
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         scaler.step(optimizer)
         scaler.update()
+        if ema is not None:
+            ema.update(model)
         total_loss += loss.item()
         n += 1
     return total_loss / max(n, 1)
@@ -102,8 +104,8 @@ def run_eval_epoch(model, dataloader, device, cfg):
         images = batch["image"].to(device) if not is_contrastive else batch["background"].to(device)
         labels = batch["label"]
         video_ids = batch["video_id"]
-        with autocast(enabled=True):
-            output = model(images)
+        with torch.no_grad(), torch.cuda.amp.autocast(enabled=False):
+            output = model(images.float())
         if is_prompt:
             cls_logits, prompt_logits = output
             cls_prob = torch.softmax(cls_logits, dim=1)[:, 1]
@@ -118,6 +120,12 @@ def run_eval_epoch(model, dataloader, device, cfg):
                 "score": float(probs[i]),
                 "label": int(labels[i]),
             })
+
+    if torch.distributed.is_initialized():
+        gathered_rows = [None for _ in range(torch.distributed.get_world_size())]
+        torch.distributed.all_gather_object(gathered_rows, all_rows)
+        all_rows = [row for rows in gathered_rows for row in rows]
+
     labels, scores = aggregate_video_predictions(all_rows)
     if len(set(labels)) < 2:
         return {"auc": 0.0, "eer": 0.0, "acc": 0.0, "loss": 0.0}

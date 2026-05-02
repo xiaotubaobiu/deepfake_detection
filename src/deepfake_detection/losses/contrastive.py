@@ -56,3 +56,10 @@ def infonce_bg_face_loss(bg_features, real_face_features, fake_face_features, te
     labels = torch.zeros(B * K, dtype=torch.long, device=bg_features.device)
 
     return F.cross_entropy(logits, labels)
+
+
+def image_text_contrastive_loss(image_features, text_features, labels, temperature=0.07):
+    image_features = F.normalize(image_features, dim=1)
+    text_features = F.normalize(text_features, dim=1)
+    logits = image_features @ text_features.t() / temperature
+    return F.cross_entropy(logits.float(), labels.long())

@@ -40,6 +40,18 @@ def prompt_contrast_step(model, batch, device, beta=0.1):
     return total_loss, cls_logits, prompt_logits
 
 
+def prompt_itc_step(model, batch, device, lambda_itc=0.1, temperature=0.07):
+    from deepfake_detection.losses.contrastive import image_text_contrastive_loss
+    images = batch["image"].to(device)
+    labels = batch["label"].to(device)
+    raw_model = model.module if hasattr(model, "module") else model
+    cls_logits, _, image_features, text_features = raw_model.forward_with_features(images)
+    cls_loss = F.cross_entropy(cls_logits, labels)
+    itc_loss = image_text_contrastive_loss(image_features, text_features, labels, temperature)
+    total_loss = cls_loss + lambda_itc * itc_loss
+    return total_loss, cls_logits
+
+
 def bgface_contrast_step(model, batch, device, lambda_align=0.1, temperature=0.07):
     bg_images = batch["background"].to(device)
     real_face = batch["real_face"].to(device)
@@ -65,8 +77,10 @@ def run_train_epoch(model, dataloader, optimizer, scaler, device, cfg, ema=None)
     loss_name = cfg.get("loss", {}).get("name", "")
     is_contrastive = loss_name == "cross_entropy_plus_contrastive"
     is_prompt = loss_name == "cross_entropy_plus_prompt"
+    is_prompt_itc = loss_name == "cross_entropy_plus_prompt_itc"
     is_bgface = loss_name == "cross_entropy_plus_bgface_contrast"
     lambda_align = cfg.get("loss", {}).get("lambda_align", 0.1)
+    lambda_itc = cfg.get("loss", {}).get("lambda_itc", 0.1)
     temperature = cfg.get("loss", {}).get("temperature", 0.07)
     beta = cfg.get("loss", {}).get("beta", 0.1)
     for batch in dataloader:
@@ -74,6 +88,8 @@ def run_train_epoch(model, dataloader, optimizer, scaler, device, cfg, ema=None)
         with autocast(enabled=True):
             if is_contrastive:
                 loss, _ = contrastive_step(model, batch, device, lambda_align, temperature)
+            elif is_prompt_itc:
+                loss, _ = prompt_itc_step(model, batch, device, lambda_itc, temperature)
             elif is_prompt:
                 loss, _, _ = prompt_contrast_step(model, batch, device, beta)
             elif is_bgface:
@@ -99,6 +115,7 @@ def run_eval_epoch(model, dataloader, device, cfg):
     loss_name = cfg.get("loss", {}).get("name", "")
     is_contrastive = loss_name == "cross_entropy_plus_contrastive"
     is_prompt = loss_name == "cross_entropy_plus_prompt"
+    is_prompt_itc = loss_name == "cross_entropy_plus_prompt_itc"
     alpha = cfg.get("loss", {}).get("alpha", 0.3)
     for batch in dataloader:
         images = batch["image"].to(device) if not is_contrastive else batch["background"].to(device)
@@ -106,13 +123,13 @@ def run_eval_epoch(model, dataloader, device, cfg):
         video_ids = batch["video_id"]
         with torch.no_grad(), torch.cuda.amp.autocast(enabled=False):
             output = model(images.float())
-        if is_prompt:
+        if is_prompt and not is_prompt_itc:
             cls_logits, prompt_logits = output
             cls_prob = torch.softmax(cls_logits, dim=1)[:, 1]
             prompt_prob = torch.softmax(prompt_logits, dim=1)[:, 1]
             probs = ((1 - alpha) * cls_prob + alpha * prompt_prob).cpu().numpy()
         else:
-            logits = output
+            logits = output[0] if isinstance(output, tuple) else output
             probs = torch.softmax(logits, dim=1)[:, 1].cpu().numpy()
         for i in range(len(probs)):
             all_rows.append({

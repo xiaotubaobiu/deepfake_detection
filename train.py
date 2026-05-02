@@ -160,8 +160,17 @@ def main():
     barrier()
 
     model = build_model(cfg["model"]).to(device)
+    init_ckpt_path = cfg.get("train", {}).get("init_checkpoint")
+    if init_ckpt_path:
+        ckpt = torch.load(init_ckpt_path, map_location=device)
+        state = ckpt["model_state_dict"]
+        missing, unexpected = model.load_state_dict(state, strict=False)
+        if is_main_process():
+            print(f"Initialized from {init_ckpt_path}")
+            print(f"Missing keys: {len(missing)}, Unexpected keys: {len(unexpected)}")
     if torch.distributed.is_initialized():
-        model = DDP(model, device_ids=[local_rank])
+        loss_name = cfg.get("loss", {}).get("name", "")
+        model = DDP(model, device_ids=[local_rank], find_unused_parameters=loss_name == "cross_entropy_plus_prompt")
 
     optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = build_scheduler(optimizer, epochs, warmup_epochs)

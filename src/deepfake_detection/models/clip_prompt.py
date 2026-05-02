@@ -13,43 +13,87 @@ def build_fixed_prompt_texts():
 
 
 class CLIPPromptBinaryClassifier(nn.Module):
-    def __init__(self, clip_model_name: str = "ViT-B/16", tau: float = 0.07):
+    def __init__(
+        self,
+        clip_model_name: str = "ViT-B/16",
+        tau: float = 0.07,
+        freeze_visual: str = "none",
+        freeze_visual_layers: int = 9,
+        projection_dim: int = 512,
+        classifier_normalize_features: bool = True,
+    ):
         super().__init__()
         clip_model, _ = clip.load(clip_model_name, device="cpu")
 
-        # 只保留 visual encoder（可训练）
         self.visual = clip_model.visual
+        self.classifier = nn.Linear(self.visual.output_dim, 2)
+        self.classifier_normalize_features = classifier_normalize_features
+        self.image_projection = nn.Linear(self.visual.output_dim, projection_dim, bias=False)
+        self.text_projection = nn.Linear(self.visual.output_dim, projection_dim, bias=False)
+        self.register_buffer("tau", torch.tensor(tau))
 
-        # 预计算 prompt 特征（冻结 text encoder，用完即弃）
         real_texts, fake_texts = build_fixed_prompt_texts()
         real_tokens = clip.tokenize(real_texts)
         fake_tokens = clip.tokenize(fake_texts)
         with torch.no_grad():
             real_features = clip_model.encode_text(real_tokens)
             fake_features = clip_model.encode_text(fake_tokens)
-        real_features = F.normalize(real_features, dim=-1)
-        fake_features = F.normalize(fake_features, dim=-1)
-        self.register_buffer("_real_features", real_features)
-        self.register_buffer("_fake_features", fake_features)
-        # text encoder 随 clip_model 一起释放，不保留引用
+        self.register_buffer("_real_features", F.normalize(real_features, dim=-1))
+        self.register_buffer("_fake_features", F.normalize(fake_features, dim=-1))
 
-        # 分类头
-        self.classifier = nn.Linear(self.visual.output_dim, 2)
+        self.apply_visual_freeze(freeze_visual, freeze_visual_layers)
 
-        # 温度参数（固定，不可训练，随模型保存/迁移）
-        self.register_buffer("tau", torch.tensor(tau))
+    def apply_visual_freeze(self, mode: str, freeze_visual_layers: int):
+        if mode == "none":
+            return
+        if mode == "all":
+            for p in self.visual.parameters():
+                p.requires_grad = False
+            return
+        if mode == "partial":
+            for p in self.visual.parameters():
+                p.requires_grad = False
+            for p in self.visual.ln_post.parameters():
+                p.requires_grad = True
+            if self.visual.proj is not None:
+                self.visual.proj.requires_grad = True
+            blocks = self.visual.transformer.resblocks
+            for block in blocks[freeze_visual_layers:]:
+                for p in block.parameters():
+                    p.requires_grad = True
+            return
+        raise ValueError(f"Unknown freeze_visual mode: {mode}")
 
-    def forward(self, images):
-        # 1. 视觉特征
+    def encode_image_features(self, images):
         image_features = self.visual(images)
-        image_features = F.normalize(image_features, dim=-1)
+        return F.normalize(image_features, dim=-1)
 
-        # 2. 分类头 logits
-        cls_logits = self.classifier(image_features.float())
+    def encode_raw_image_features(self, images):
+        return self.visual(images)
 
-        # 3. Prompt logits（温度缩放）
+    def prompt_logits_from_features(self, image_features):
         real_sim = (image_features @ self._real_features.T).mean(dim=1, keepdim=True)
         fake_sim = (image_features @ self._fake_features.T).mean(dim=1, keepdim=True)
-        prompt_logits = torch.cat([real_sim, fake_sim], dim=1) / self.tau
+        return torch.cat([real_sim, fake_sim], dim=1) / self.tau
 
+    def forward(self, images):
+        raw_features = self.encode_raw_image_features(images)
+        image_features = F.normalize(raw_features, dim=-1)
+        classifier_features = image_features if self.classifier_normalize_features else raw_features
+        cls_logits = self.classifier(classifier_features.float())
+        prompt_logits = self.prompt_logits_from_features(image_features)
         return cls_logits, prompt_logits
+
+    def forward_with_features(self, images):
+        raw_features = self.encode_raw_image_features(images)
+        image_features = F.normalize(raw_features, dim=-1)
+        classifier_features = image_features if self.classifier_normalize_features else raw_features
+        cls_logits = self.classifier(classifier_features.float())
+        prompt_logits = self.prompt_logits_from_features(image_features)
+        text_features = torch.stack([
+            self._real_features.mean(dim=0),
+            self._fake_features.mean(dim=0),
+        ], dim=0)
+        image_features = self.image_projection(image_features.float())
+        text_features = self.text_projection(text_features.float())
+        return cls_logits, prompt_logits, image_features, text_features

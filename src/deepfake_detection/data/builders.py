@@ -22,6 +22,18 @@ def _worker_init_fn(worker_id):
     np.random.seed(seed + worker_id)
 
 
+def _dataloader_kwargs(num_workers):
+    kwargs = {
+        "num_workers": num_workers,
+        "pin_memory": True,
+        "worker_init_fn": _worker_init_fn,
+    }
+    if num_workers > 0:
+        kwargs["persistent_workers"] = True
+        kwargs["prefetch_factor"] = 4
+    return kwargs
+
+
 def _get_normalization(cfg):
     model_name = cfg.get("model", {}).get("name", "")
     if "clip" in model_name:
@@ -105,8 +117,9 @@ def build_train_loader(cfg, distributed=True):
     g.manual_seed(seed)
     sampler = DistributedSampler(dataset, shuffle=True, seed=seed) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
-                      shuffle=(sampler is None), num_workers=num_workers, pin_memory=True,
-                      drop_last=True, worker_init_fn=_worker_init_fn, generator=g)
+                      shuffle=(sampler is None),
+                      drop_last=True, generator=g,
+                      **_dataloader_kwargs(num_workers))
 
 
 def build_eval_loader(cfg, domain="ffpp", distributed=True):
@@ -140,8 +153,8 @@ def build_eval_loader(cfg, domain="ffpp", distributed=True):
     g.manual_seed(seed)
     sampler = DistributedSampler(dataset, shuffle=False) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
-                      shuffle=False, num_workers=num_workers, pin_memory=True,
-                      drop_last=False, worker_init_fn=_worker_init_fn, generator=g)
+                      shuffle=False, drop_last=False, generator=g,
+                      **_dataloader_kwargs(num_workers))
 
 
 def build_val_loader(cfg, distributed=True):
@@ -185,8 +198,8 @@ def build_val_loader(cfg, distributed=True):
     g.manual_seed(seed)
     sampler = DistributedSampler(dataset, shuffle=False) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
-                      shuffle=False, num_workers=num_workers, pin_memory=True,
-                      drop_last=False, worker_init_fn=_worker_init_fn, generator=g)
+                      shuffle=False, drop_last=False, generator=g,
+                      **_dataloader_kwargs(num_workers))
 
 
 def build_bgface_train_loader(cfg, distributed=True):
@@ -210,6 +223,5 @@ def build_bgface_train_loader(cfg, distributed=True):
     )
     sampler = DistributedSampler(dataset, shuffle=True) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
-                      shuffle=(sampler is None), num_workers=num_workers,
-                      pin_memory=True, drop_last=True,
-                      worker_init_fn=_worker_init_fn)
+                      shuffle=(sampler is None), drop_last=True,
+                      **_dataloader_kwargs(num_workers))

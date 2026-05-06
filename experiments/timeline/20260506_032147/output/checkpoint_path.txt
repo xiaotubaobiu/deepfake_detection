@@ -1,1 +1,0 @@
-experiments/outputs/norm_shortcut_raw_s2048/20260506_032147/best_model.pth

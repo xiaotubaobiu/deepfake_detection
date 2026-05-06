@@ -17,7 +17,7 @@ def test_norm_shortcut_config_loads_from_experiments_configs():
     sys.path.insert(0, str(Path.cwd()))
     from train import load_config
 
-    cfg = load_config("experiments/configs/norm_shortcut_raw_s42.yaml")
+    cfg = load_config("experiments/20260505_130308/config/config.yaml")
     assert cfg["experiment_name"] == "norm_shortcut_raw_s42"
-    assert cfg["train"]["output_dir"] == "experiments/outputs"
+    assert cfg["train"]["output_dir"] == "experiments"
     assert cfg["train"]["seed"] == 42

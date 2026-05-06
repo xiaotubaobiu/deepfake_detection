@@ -1,0 +1,21 @@
+Exp: norm_shortcut_raw_s2048
+Model: clip_finetune
+Best epoch: 10
+Per-GPU batch: 128
+Val:  AUC=0.9957 EER=0.0319 ACC=0.9503
+FF++: AUC=0.9998 EER=0.0061 ACC=0.9930
+CDF:  AUC=0.8397 EER=0.2410 ACC=0.9215
+DFD:  AUC=0.8479 EER=0.2451 ACC=0.6985
+
+Angle/length evaluation on FF++/CDF/DFD:
+ffpp raw_angle_length: AUC=0.9998 EER=0.0061 ACC@0.5=0.9930 ACC@val_thr=0.9938
+ffpp angle: AUC=0.9998 EER=0.0056 ACC@0.5=0.9930 ACC@val_thr=0.9930
+cdf raw_angle_length: AUC=0.8397 EER=0.2410 ACC@0.5=0.9215 ACC@val_thr=0.9225
+cdf angle: AUC=0.8615 EER=0.2234 ACC@0.5=0.9192 ACC@val_thr=0.9234
+dfd raw_angle_length: AUC=0.8479 EER=0.2451 ACC@0.5=0.6985 ACC@val_thr=0.6640
+dfd angle: AUC=0.8359 EER=0.2564 ACC@0.5=0.7369 ACC@val_thr=0.6696
+
+Length-only evaluation on FF++/CDF/DFD:
+ffpp feature_length: AUC=0.9625 EER=0.0854 ACC@0.5=0.8770 ACC@val_thr=0.9016
+cdf feature_length: AUC=0.8085 EER=0.2639 ACC@0.5=0.9174 ACC@val_thr=0.7437
+dfd feature_length: AUC=0.5845 EER=0.4563 ACC@0.5=0.8941 ACC@val_thr=0.2496

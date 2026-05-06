@@ -8,8 +8,10 @@ def test_build_rgb_augment_uses_expected_policy_names():
     assert names == [
         "HorizontalFlip",
         "Rotate",
-        "RandomBrightnessContrast",
+        "GaussianBlur",
+        "OneOf",
         "ImageCompression",
+        "Normalize",
     ]
 
 

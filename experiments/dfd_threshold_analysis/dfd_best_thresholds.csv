@@ -1,0 +1,11 @@
+variant,seed,best_acc,note
+raw,s42,0.897,ordinary best ACC degenerates toward almost-always-fake under DFD imbalance
+raw,s123,0.897,ordinary best ACC degenerates toward almost-always-fake under DFD imbalance
+raw,s7,0.897,ordinary best ACC degenerates toward almost-always-fake under DFD imbalance
+raw,s999,0.897,ordinary best ACC degenerates toward almost-always-fake under DFD imbalance
+raw,s2048,0.897,ordinary best ACC degenerates toward almost-always-fake under DFD imbalance
+feature_norm,s42,0.897,ordinary best ACC degenerates toward almost-always-fake under DFD imbalance
+feature_norm,s123,0.897,ordinary best ACC degenerates toward almost-always-fake under DFD imbalance
+feature_norm,s7,0.897,ordinary best ACC degenerates toward almost-always-fake under DFD imbalance
+feature_norm,s999,0.897,ordinary best ACC degenerates toward almost-always-fake under DFD imbalance
+feature_norm,s2048,0.897,ordinary best ACC degenerates toward almost-always-fake under DFD imbalance

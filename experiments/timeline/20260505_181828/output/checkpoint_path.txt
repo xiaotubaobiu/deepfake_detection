@@ -1,1 +1,0 @@
-experiments/outputs/norm_shortcut_normtrain_s123/20260505_181828/best_model.pth

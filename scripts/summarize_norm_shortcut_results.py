@@ -127,9 +127,9 @@ def split_eval_tables(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--train-root", default="experiments/outputs")
-    parser.add_argument("--eval-root", default="experiments/outputs/norm_shortcut_eval")
-    parser.add_argument("--output-dir", default="experiments/outputs/norm_shortcut_tables")
+    parser.add_argument("--train-root", default="experiments")
+    parser.add_argument("--eval-root", default="experiments/paper_eval")
+    parser.add_argument("--output-dir", default="experiments/norm_shortcut_tables")
     args = parser.parse_args()
 
     train_root = Path(args.train_root)

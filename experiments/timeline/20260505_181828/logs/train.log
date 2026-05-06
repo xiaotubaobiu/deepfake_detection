@@ -1,0 +1,38 @@
+[2026-05-05 18:18:28] Experiment: norm_shortcut_normtrain_s123, Device: cuda:0, Config: experiments/configs/norm_shortcut_normtrain_s123.yaml
+[2026-05-05 18:18:28] Per-GPU batch: 128, Epochs: 15, LR: 1e-05, Warmup: 1, EMA: 0.999
+[2026-05-05 18:18:28] Log dir: experiments/outputs/norm_shortcut_normtrain_s123/20260505_181828
+[2026-05-05 18:18:53] Train samples: 149956, Val samples: 25584, FF++ test: 164221, CDF test: 396284
+[2026-05-05 18:24:40] Epoch 1/15 (347.5s) loss=0.5387 val_auc=0.7183 val_eer=0.3416 val_acc=0.5609
+[2026-05-05 18:24:41]   -> Best model saved (val AUC=0.7183)
+[2026-05-05 18:30:34] Epoch 2/15 (353.4s) loss=0.4225 val_auc=0.8667 val_eer=0.2097 val_acc=0.7869
+[2026-05-05 18:30:35]   -> Best model saved (val AUC=0.8667)
+[2026-05-05 18:36:31] Epoch 3/15 (356.1s) loss=0.3971 val_auc=0.9304 val_eer=0.1481 val_acc=0.8237
+[2026-05-05 18:36:32]   -> Best model saved (val AUC=0.9304)
+[2026-05-05 18:42:30] Epoch 4/15 (358.4s) loss=0.3638 val_auc=0.9604 val_eer=0.1100 val_acc=0.8353
+[2026-05-05 18:42:31]   -> Best model saved (val AUC=0.9604)
+[2026-05-05 18:48:19] Epoch 5/15 (348.7s) loss=0.3389 val_auc=0.9762 val_eer=0.0709 val_acc=0.8669
+[2026-05-05 18:48:20]   -> Best model saved (val AUC=0.9762)
+[2026-05-05 18:54:09] Epoch 6/15 (349.1s) loss=0.3213 val_auc=0.9847 val_eer=0.0603 val_acc=0.8997
+[2026-05-05 18:54:10]   -> Best model saved (val AUC=0.9847)
+[2026-05-05 19:00:10] Epoch 7/15 (360.1s) loss=0.3015 val_auc=0.9900 val_eer=0.0422 val_acc=0.9328
+[2026-05-05 19:00:10]   -> Best model saved (val AUC=0.9900)
+[2026-05-05 19:05:57] Epoch 8/15 (346.7s) loss=0.2874 val_auc=0.9934 val_eer=0.0400 val_acc=0.9531
+[2026-05-05 19:05:58]   -> Best model saved (val AUC=0.9934)
+[2026-05-05 19:11:53] Epoch 9/15 (354.9s) loss=0.2740 val_auc=0.9953 val_eer=0.0375 val_acc=0.9691
+[2026-05-05 19:11:53]   -> Best model saved (val AUC=0.9953)
+[2026-05-05 19:17:48] Epoch 10/15 (354.3s) loss=0.2634 val_auc=0.9963 val_eer=0.0306 val_acc=0.9672
+[2026-05-05 19:17:48]   -> Best model saved (val AUC=0.9963)
+[2026-05-05 19:23:52] Epoch 11/15 (364.2s) loss=0.2554 val_auc=0.9967 val_eer=0.0287 val_acc=0.9728
+[2026-05-05 19:23:53]   -> Best model saved (val AUC=0.9967)
+[2026-05-05 19:30:38] Epoch 12/15 (404.9s) loss=0.2494 val_auc=0.9969 val_eer=0.0284 val_acc=0.9728
+[2026-05-05 19:30:38]   -> Best model saved (val AUC=0.9969)
+[2026-05-05 19:36:43] Epoch 13/15 (364.9s) loss=0.2454 val_auc=0.9968 val_eer=0.0312 val_acc=0.9606
+[2026-05-05 19:42:44] Epoch 14/15 (360.7s) loss=0.2418 val_auc=0.9967 val_eer=0.0291 val_acc=0.9591
+[2026-05-05 19:48:45] Epoch 15/15 (360.5s) loss=0.2416 val_auc=0.9966 val_eer=0.0300 val_acc=0.9559
+[2026-05-05 19:48:45] Loading best model for final test evaluation...
+[2026-05-05 20:02:11] Val (best): auc=0.9969 eer=0.0284 acc=0.9728
+[2026-05-05 20:02:11] FF++ test: auc=0.9995 eer=0.0066 acc=0.9912
+[2026-05-05 20:02:11] CDF test: auc=0.7466 eer=0.3142 acc=0.9188
+[2026-05-05 20:02:11] Best epoch: 12, Best val AUC: 0.9969
+[2026-05-05 20:02:11] Meta saved to experiments/outputs/norm_shortcut_normtrain_s123/20260505_181828/meta.json
+[2026-05-05 20:02:11] Results saved to experiments/outputs/norm_shortcut_normtrain_s123/20260505_181828/results_summary.txt

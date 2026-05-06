@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader, DistributedSampler
 
 from deepfake_detection.data.constants import ALL_METHODS
-from deepfake_detection.data.index_ffpp import load_json_index
+from deepfake_detection.data.index_ffpp import load_json_index, load_dfd_json_index
 from deepfake_detection.data.index_ffpp import (
     index_train_aligned_triplets,
 )
@@ -22,15 +22,16 @@ def _worker_init_fn(worker_id):
     np.random.seed(seed + worker_id)
 
 
-def _dataloader_kwargs(num_workers):
+def _dataloader_kwargs(num_workers, prefetch_factor=4):
     kwargs = {
         "num_workers": num_workers,
         "pin_memory": True,
         "worker_init_fn": _worker_init_fn,
     }
     if num_workers > 0:
-        kwargs["persistent_workers"] = True
-        kwargs["prefetch_factor"] = 4
+        kwargs["persistent_workers"] = False
+        kwargs["prefetch_factor"] = prefetch_factor
+        kwargs["multiprocessing_context"] = "spawn"
     return kwargs
 
 
@@ -77,6 +78,7 @@ def build_train_loader(cfg, distributed=True):
     frames_per_video = cfg["dataset"]["frames_per_video"]
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
+    prefetch_factor = cfg["train"].get("prefetch_factor", 4)
     seed = cfg["train"].get("seed", 42)
     require_triplets = cfg.get("data", {}).get("require_aligned_triplets", False)
     norm_mean, norm_std = _get_normalization(cfg)
@@ -119,7 +121,7 @@ def build_train_loader(cfg, distributed=True):
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
                       shuffle=(sampler is None),
                       drop_last=True, generator=g,
-                      **_dataloader_kwargs(num_workers))
+                      **_dataloader_kwargs(num_workers, prefetch_factor))
 
 
 def build_eval_loader(cfg, domain="ffpp", distributed=True):
@@ -127,25 +129,34 @@ def build_eval_loader(cfg, domain="ffpp", distributed=True):
     methods = cfg["dataset"].get("methods") or ALL_METHODS
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
+    prefetch_factor = cfg["train"].get("prefetch_factor", 4)
     seed = cfg["train"].get("seed", 42)
     norm_mean, norm_std = _get_normalization(cfg)
 
-    test_domain = "ff" if domain == "ffpp" else "cdf"
+    if domain == "dfd":
+        real_records = load_dfd_json_index(root, "test", 0)
+        fake_records = load_dfd_json_index(root, "test", 1)
+        all_records = real_records + fake_records
+        if not all_records:
+            raise FileNotFoundError(
+                f"No DFD records found under {root}/dataset_json/DeepFakeDetection.json; run scripts/prepare_dfd_df40.py first."
+            )
+    else:
+        test_domain = "ff" if domain == "ffpp" else "cdf"
 
-    # Real: from JSON test split (CDF JSON uses Celeb-DF-v2 real)
-    real_records = []
-    for method in methods:
-        recs = load_json_index(root, method, test_domain, "test", 0)
-        real_records.extend(recs)
-    real_deduped = _deduplicate_videos(real_records)
+        real_records = []
+        for method in methods:
+            recs = load_json_index(root, method, test_domain, "test", 0)
+            real_records.extend(recs)
+        real_deduped = _deduplicate_videos(real_records)
 
-    # Fake: from JSON test split
-    fake_records = []
-    for method in methods:
-        recs = load_json_index(root, method, test_domain, "test", 1)
-        fake_records.extend(recs)
+        fake_records = []
+        for method in methods:
+            recs = load_json_index(root, method, test_domain, "test", 1)
+            fake_records.extend(recs)
 
-    all_records = real_deduped + fake_records
+        all_records = real_deduped + fake_records
+
     dataset = FrameClassificationDataset(all_records, augment=False,
                                         normalize_mean=norm_mean, normalize_std=norm_std,
                                         seed=seed)
@@ -154,7 +165,7 @@ def build_eval_loader(cfg, domain="ffpp", distributed=True):
     sampler = DistributedSampler(dataset, shuffle=False) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
                       shuffle=False, drop_last=False, generator=g,
-                      **_dataloader_kwargs(num_workers))
+                      **_dataloader_kwargs(num_workers, prefetch_factor))
 
 
 def build_val_loader(cfg, distributed=True):
@@ -164,6 +175,7 @@ def build_val_loader(cfg, distributed=True):
     frames_per_video = cfg["dataset"]["frames_per_video"]
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
+    prefetch_factor = cfg["train"].get("prefetch_factor", 4)
     seed = cfg["train"].get("seed", 42)
     norm_mean, norm_std = _get_normalization(cfg)
 
@@ -199,7 +211,22 @@ def build_val_loader(cfg, distributed=True):
     sampler = DistributedSampler(dataset, shuffle=False) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
                       shuffle=False, drop_last=False, generator=g,
-                      **_dataloader_kwargs(num_workers))
+                      **_dataloader_kwargs(num_workers, prefetch_factor))
+
+
+def build_external_eval_loader(cfg, records, distributed=True, batch_size=None, num_workers=None):
+    seed = cfg["train"].get("seed", 42)
+    prefetch_factor = cfg["train"].get("prefetch_factor", 4)
+    norm_mean, norm_std = _get_normalization(cfg)
+    dataset = FrameClassificationDataset(records, augment=False,
+                                         normalize_mean=norm_mean, normalize_std=norm_std,
+                                         seed=seed)
+    g = torch.Generator()
+    g.manual_seed(seed)
+    sampler = DistributedSampler(dataset, shuffle=False) if distributed else None
+    return DataLoader(dataset, batch_size=batch_size or cfg["train"].get("per_gpu_batch", 32), sampler=sampler,
+                      shuffle=False, drop_last=False, generator=g,
+                      **_dataloader_kwargs(num_workers if num_workers is not None else cfg["train"].get("num_workers", 4), prefetch_factor))
 
 
 def build_bgface_train_loader(cfg, distributed=True):
@@ -208,6 +235,7 @@ def build_bgface_train_loader(cfg, distributed=True):
     max_videos = cfg["dataset"]["train_videos_per_method"]
     batch_size = cfg["train"].get("per_gpu_batch", 32)
     num_workers = cfg["train"].get("num_workers", 4)
+    prefetch_factor = cfg["train"].get("prefetch_factor", 4)
     num_bg_patches = cfg.get("loss", {}).get("num_bg_patches", 4)
     from deepfake_detection.data.transforms import CLIP_MEAN, CLIP_STD
 
@@ -224,4 +252,4 @@ def build_bgface_train_loader(cfg, distributed=True):
     sampler = DistributedSampler(dataset, shuffle=True) if distributed else None
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler,
                       shuffle=(sampler is None), drop_last=True,
-                      **_dataloader_kwargs(num_workers))
+                      **_dataloader_kwargs(num_workers, prefetch_factor))

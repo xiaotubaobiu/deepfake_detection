@@ -1,0 +1,35 @@
+[2026-05-05 13:03:08] Experiment: norm_shortcut_raw_s42, Device: cuda:0, Config: experiments/configs/norm_shortcut_raw_s42.yaml
+[2026-05-05 13:03:08] Per-GPU batch: 128, Epochs: 15, LR: 1e-05, Warmup: 1, EMA: 0.999
+[2026-05-05 13:03:08] Log dir: experiments/outputs/norm_shortcut_raw_s42/20260505_130308
+[2026-05-05 13:03:48] Train samples: 149956, Val samples: 25584, FF++ test: 164221, CDF test: 396284
+[2026-05-05 13:13:23] Epoch 1/15 (575.5s) loss=0.3498 val_auc=0.6236 val_eer=0.4178 val_acc=0.5988
+[2026-05-05 13:13:24]   -> Best model saved (val AUC=0.6236)
+[2026-05-05 13:22:09] Epoch 2/15 (524.7s) loss=0.1606 val_auc=0.8042 val_eer=0.2594 val_acc=0.6059
+[2026-05-05 13:22:09]   -> Best model saved (val AUC=0.8042)
+[2026-05-05 13:31:13] Epoch 3/15 (544.0s) loss=0.0932 val_auc=0.9115 val_eer=0.1619 val_acc=0.6422
+[2026-05-05 13:31:14]   -> Best model saved (val AUC=0.9115)
+[2026-05-05 13:40:16] Epoch 4/15 (542.3s) loss=0.0668 val_auc=0.9608 val_eer=0.1094 val_acc=0.7219
+[2026-05-05 13:40:17]   -> Best model saved (val AUC=0.9608)
+[2026-05-05 13:49:33] Epoch 5/15 (555.8s) loss=0.0513 val_auc=0.9818 val_eer=0.0691 val_acc=0.8200
+[2026-05-05 13:49:34]   -> Best model saved (val AUC=0.9818)
+[2026-05-05 13:58:46] Epoch 6/15 (552.6s) loss=0.0430 val_auc=0.9911 val_eer=0.0503 val_acc=0.8928
+[2026-05-05 13:58:47]   -> Best model saved (val AUC=0.9911)
+[2026-05-05 14:05:56] Epoch 7/15 (429.0s) loss=0.0361 val_auc=0.9949 val_eer=0.0391 val_acc=0.9372
+[2026-05-05 14:05:57]   -> Best model saved (val AUC=0.9949)
+[2026-05-05 14:13:02] Epoch 8/15 (425.4s) loss=0.0261 val_auc=0.9962 val_eer=0.0319 val_acc=0.9647
+[2026-05-05 14:13:03]   -> Best model saved (val AUC=0.9962)
+[2026-05-05 14:20:25] Epoch 9/15 (442.3s) loss=0.0191 val_auc=0.9967 val_eer=0.0319 val_acc=0.9691
+[2026-05-05 14:20:26]   -> Best model saved (val AUC=0.9967)
+[2026-05-05 14:25:21] Epoch 10/15 (295.2s) loss=0.0177 val_auc=0.9966 val_eer=0.0375 val_acc=0.9631
+[2026-05-05 14:30:14] Epoch 11/15 (293.3s) loss=0.0110 val_auc=0.9965 val_eer=0.0387 val_acc=0.9622
+[2026-05-05 14:35:05] Epoch 12/15 (290.8s) loss=0.0096 val_auc=0.9962 val_eer=0.0337 val_acc=0.9463
+[2026-05-05 14:39:53] Epoch 13/15 (288.4s) loss=0.0083 val_auc=0.9957 val_eer=0.0391 val_acc=0.9494
+[2026-05-05 14:44:41] Epoch 14/15 (287.7s) loss=0.0063 val_auc=0.9952 val_eer=0.0484 val_acc=0.9469
+[2026-05-05 14:44:41] Early stopping at epoch 14
+[2026-05-05 14:44:41] Loading best model for final test evaluation...
+[2026-05-05 14:58:59] Val (best): auc=0.9967 eer=0.0319 acc=0.9691
+[2026-05-05 14:58:59] FF++ test: auc=0.9997 eer=0.0020 acc=0.9965
+[2026-05-05 14:58:59] CDF test: auc=0.8328 eer=0.2407 acc=0.9220
+[2026-05-05 14:58:59] Best epoch: 9, Best val AUC: 0.9967
+[2026-05-05 14:58:59] Meta saved to experiments/outputs/norm_shortcut_raw_s42/20260505_130308/meta.json
+[2026-05-05 14:58:59] Results saved to experiments/outputs/norm_shortcut_raw_s42/20260505_130308/results_summary.txt

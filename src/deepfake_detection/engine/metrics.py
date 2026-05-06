@@ -24,14 +24,31 @@ def compute_acc(labels, scores, threshold=0.5):
     return float(accuracy_score(labels, preds))
 
 
-def aggregate_video_predictions(rows: list[dict]) -> tuple[list[int], list[float]]:
-    from collections import defaultdict
-    by_video: dict[str, dict] = defaultdict(lambda: {"scores": [], "label": None})
-    for row in rows:
-        by_video[row["video_id"]]["scores"].append(row["score"])
-        by_video[row["video_id"]]["label"] = row["label"]
+def update_video_aggregate(aggregates: dict, video_id, score: float, label: int) -> None:
+    data = aggregates.setdefault(video_id, {"score_sum": 0.0, "count": 0, "label": label})
+    data["score_sum"] += score
+    data["count"] += 1
+    data["label"] = label
+
+
+def merge_video_aggregates(target: dict, source: dict) -> None:
+    for video_id, data in source.items():
+        current = target.setdefault(video_id, {"score_sum": 0.0, "count": 0, "label": data["label"]})
+        current["score_sum"] += data["score_sum"]
+        current["count"] += data["count"]
+        current["label"] = data["label"]
+
+
+def video_aggregates_to_predictions(aggregates: dict) -> tuple[list[int], list[float]]:
     labels, scores = [], []
-    for vid, data in by_video.items():
+    for data in aggregates.values():
         labels.append(data["label"])
-        scores.append(mean_video_score(data["scores"]))
+        scores.append(float(data["score_sum"] / max(data["count"], 1)))
     return labels, scores
+
+
+def aggregate_video_predictions(rows: list[dict]) -> tuple[list[int], list[float]]:
+    by_video: dict[str, dict] = {}
+    for row in rows:
+        update_video_aggregate(by_video, row["video_id"], float(row["score"]), int(row["label"]))
+    return video_aggregates_to_predictions(by_video)

@@ -1,0 +1,22 @@
+{
+  "experiment_name": "norm_shortcut_raw_s42",
+  "start_time": "20260505_130308",
+  "config_file": "N/A",
+  "model": "clip_finetune",
+  "per_gpu_batch": 128,
+  "epochs": 15,
+  "lr": 1e-05,
+  "loss": "cross_entropy",
+  "end_time": "20260505_145859",
+  "best_epoch": 9,
+  "best_val_auc": 0.9967121093750001,
+  "final_val_auc": 0.9967121093750001,
+  "final_val_eer": 0.03187499999999997,
+  "final_val_acc": 0.9690625,
+  "ffpp_test_auc": 0.999749498997996,
+  "ffpp_test_eer": 0.002004008016032066,
+  "ffpp_test_acc": 0.9964850615114236,
+  "cdf_test_auc": 0.832808306418596,
+  "cdf_test_eer": 0.2407257881089933,
+  "cdf_test_acc": 0.9220055710306406
+}

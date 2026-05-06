@@ -1,8 +1,15 @@
 from __future__ import annotations
 
 import clip
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+
+def cosine_classifier_logits(features, weight, bias=None, scale: float = 16.0):
+    features = F.normalize(features, dim=-1)
+    weight = F.normalize(weight, dim=-1)
+    return scale * features @ weight.t()
 
 
 class CLIPFineTuneBinaryClassifier(nn.Module):

@@ -1,0 +1,36 @@
+dataset:
+  root: /Dataset/deepfake_detection/DF40_all
+  methods: []
+  train_videos_per_method: 200
+  frames_per_video: 8
+  val_videos_per_method: 100
+  image_size: 224
+  real_sampling: oversample_per_method
+  use_mask: false
+augment:
+  horizontal_flip_p: 0.5
+  rotate_limit: 10
+  rotate_p: 0.5
+  brightness_limit: 0.1
+  contrast_limit: 0.1
+  brightness_contrast_p: 0.5
+  compression_quality_lower: 40
+  compression_quality_upper: 100
+  compression_p: 0.2
+model:
+  clip_model_name: ViT-B/16
+train:
+  launcher: torchrun
+  distributed: ddp
+  image_size: 224
+  per_gpu_batch: 256
+  num_workers: 8
+  epochs: 30
+  lr: 0.0001
+  weight_decay: 0.00001
+  patience: 5
+  seed: 42
+  output_dir: experiments/outputs
+  num_nodes: 1
+  gpus_per_node: 8
+  precision: amp

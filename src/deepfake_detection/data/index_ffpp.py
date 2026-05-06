@@ -14,6 +14,14 @@ class FrameRecord:
     landmark_path: str | None
     label: int
 
+    @property
+    def video_id(self) -> str:
+        return self.pair_id
+
+    @property
+    def sample_id(self) -> str:
+        return f"{self.frame_path}::{self.label}::{self.video_id}"
+
 
 def _remap_path(json_path: str, root: str) -> str:
     """Remap JSON path to actual filesystem path."""
@@ -32,7 +40,7 @@ def load_json_index(
     video_range: tuple[int, int] | None = None,
 ) -> list[FrameRecord]:
     """Load frame records from a pre-built JSON index file."""
-    json_dir = Path(root) / "dataset_json"
+    json_dir = Path(root) / "dataset_json_update"
     json_path = json_dir / f"{method}_{domain}.json"
     if not json_path.exists():
         return []
@@ -73,6 +81,38 @@ def load_json_index(
     return records
 
 
+def load_dfd_json_index(root: str, split: str, label: int, compression: str = "c23") -> list[FrameRecord]:
+    json_path = Path(root) / "dataset_json" / "DeepFakeDetection.json"
+    if not json_path.exists():
+        return []
+
+    with open(json_path) as f:
+        data = json.load(f)
+
+    category = "DFD_real" if label == 0 else "DFD_fake"
+    section = data.get("DeepFakeDetection", {}).get(category, {}).get(split, {}).get(compression, {})
+    if not section:
+        return []
+
+    records = []
+    for video_id, vid_data in sorted(section.items()):
+        frames = vid_data.get("frames", [])
+        landmarks = vid_data.get("landmarks", [])
+        for i, frame_path in enumerate(frames):
+            landmark_path = None
+            if i < len(landmarks) and landmarks[i]:
+                landmark_path = landmarks[i]
+            records.append(FrameRecord(
+                method=category,
+                pair_id=video_id,
+                frame_name=Path(frame_path).name,
+                frame_path=frame_path,
+                landmark_path=landmark_path,
+                label=label,
+            ))
+    return records
+
+
 def build_aligned_pair_key(method: str, pair_id: str, frame_name: str) -> str:
     frame_id = Path(frame_name).stem
     return f"{method}::{pair_id}::{frame_id}"
@@ -84,7 +124,6 @@ def index_train_aligned_triplets(root: str, method: str, max_videos: int | None 
     if not frames_dir.is_dir():
         return []
 
-    # --- inline: index fake frames ---
     fake_records: list[FrameRecord] = []
     video_dirs = sorted([d for d in frames_dir.iterdir() if d.is_dir()])
     if max_videos is not None:
@@ -103,7 +142,6 @@ def index_train_aligned_triplets(root: str, method: str, max_videos: int | None 
                 label=1,
             ))
 
-    # --- inline: index real (anchor) frames ---
     anchor_dir = Path(root) / "DF40_train" / "anchor"
     real_index: dict[tuple[str, str], FrameRecord] = {}
     if anchor_dir.is_dir():
@@ -122,8 +160,6 @@ def index_train_aligned_triplets(root: str, method: str, max_videos: int | None 
                 )
                 real_index[(rec.pair_id, rec.frame_name)] = rec
 
-    # --- match fake to real ---
-    # fake pair_id format: "001_870" (source_target), anchor id is "001"
     triplets = []
     for fake in fake_records:
         source_id = fake.pair_id.split("_")[0]

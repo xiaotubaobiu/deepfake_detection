@@ -5,7 +5,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.cuda.amp import GradScaler, autocast
 
-from deepfake_detection.engine.metrics import compute_auc, compute_eer, compute_acc, aggregate_video_predictions
+from deepfake_detection.engine.metrics import (
+    compute_auc,
+    compute_eer,
+    compute_acc,
+    merge_video_aggregates,
+    update_video_aggregate,
+    video_aggregates_to_predictions,
+)
+from deepfake_detection.evaluation.sample_eval import (
+    build_sample_rows,
+    gather_rows_across_ranks,
+    summarize_sample_rows,
+    video_metrics_from_rows,
+    write_eval_summary,
+    write_sample_rows_csv,
+)
 
 
 def classification_step(model, batch, device):
@@ -109,44 +124,30 @@ def run_train_epoch(model, dataloader, optimizer, scaler, device, cfg, ema=None)
 
 
 @torch.no_grad()
-def run_eval_epoch(model, dataloader, device, cfg):
+def run_sample_eval_epoch(model, dataloader, device, cfg, output_dir: str | None = None, split_name: str = "eval"):
     model.eval()
-    all_rows = []
-    loss_name = cfg.get("loss", {}).get("name", "")
-    is_contrastive = loss_name == "cross_entropy_plus_contrastive"
-    is_prompt = loss_name == "cross_entropy_plus_prompt"
-    is_prompt_itc = loss_name == "cross_entropy_plus_prompt_itc"
-    alpha = cfg.get("loss", {}).get("alpha", 0.3)
+    rows = []
+    raw_model = model.module if hasattr(model, "module") else model
     for batch in dataloader:
-        images = batch["image"].to(device) if not is_contrastive else batch["background"].to(device)
-        labels = batch["label"]
-        video_ids = batch["video_id"]
-        with torch.no_grad(), torch.cuda.amp.autocast(enabled=False):
-            output = model(images.float())
-        if is_prompt and not is_prompt_itc:
-            cls_logits, prompt_logits = output
-            cls_prob = torch.softmax(cls_logits, dim=1)[:, 1]
-            prompt_prob = torch.softmax(prompt_logits, dim=1)[:, 1]
-            probs = ((1 - alpha) * cls_prob + alpha * prompt_prob).cpu().numpy()
-        else:
-            logits = output[0] if isinstance(output, tuple) else output
-            probs = torch.softmax(logits, dim=1)[:, 1].cpu().numpy()
-        for i in range(len(probs)):
-            all_rows.append({
-                "video_id": video_ids[i] if isinstance(video_ids, list) else video_ids[i],
-                "score": float(probs[i]),
-                "label": int(labels[i]),
-            })
+        images = batch["image"].to(device, non_blocking=True)
+        with torch.amp.autocast("cuda", enabled=False):
+            features = raw_model.visual(images.float()).float()
+            classifier_features = F.normalize(features, dim=-1) if getattr(raw_model, "normalize_features", False) else features
+            logits = raw_model.classifier(classifier_features.float())
+            prob_fake = torch.softmax(logits, dim=1)[:, 1]
+            feature_norm = features.norm(dim=-1)
+        rows.extend(build_sample_rows(batch, logits, prob_fake, feature_norm))
 
-    if torch.distributed.is_initialized():
-        gathered_rows = [None for _ in range(torch.distributed.get_world_size())]
-        torch.distributed.all_gather_object(gathered_rows, all_rows)
-        all_rows = [row for rows in gathered_rows for row in rows]
+    rows = gather_rows_across_ranks(rows)
+    summary = summarize_sample_rows(rows)
+    metrics_05 = video_metrics_from_rows(rows, threshold=0.5)
+    result = {**metrics_05, **summary, "loss": 0.0}
+    if output_dir is not None and (not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0):
+        write_sample_rows_csv(rows, f"{output_dir}/{split_name}_sample_rows.csv")
+        write_eval_summary(summary, metrics_05, f"{output_dir}/{split_name}_summary.json")
+    return result
 
-    labels, scores = aggregate_video_predictions(all_rows)
-    if len(set(labels)) < 2:
-        return {"auc": 0.0, "eer": 0.0, "acc": 0.0, "loss": 0.0}
-    auc = compute_auc(labels, scores)
-    eer = compute_eer(labels, scores)
-    acc = compute_acc(labels, scores)
-    return {"auc": auc, "eer": eer, "acc": acc}
+
+@torch.no_grad()
+def run_eval_epoch(model, dataloader, device, cfg):
+    return run_sample_eval_epoch(model, dataloader, device, cfg)

@@ -22,7 +22,11 @@ def collate_video_scores(rows: list[dict]) -> dict[str, list[float]]:
 
 
 def _load_frame(frame_path: str) -> np.ndarray:
-    return np.array(Image.open(frame_path).convert("RGB"))
+    import cv2
+    img = cv2.imread(frame_path, cv2.IMREAD_COLOR)
+    if img is None:
+        raise FileNotFoundError(f"Failed to read image: {frame_path}")
+    return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 
 def _detect_face_box(img: np.ndarray, landmark_path: str | None = None) -> tuple:
@@ -59,7 +63,15 @@ class FrameClassificationDataset(Dataset):
         img = cv2_resize(img, self.img_size)
         img = self.transform(image=img)["image"]
         tensor = torch.from_numpy(img).permute(2, 0, 1).float()
-        return {"image": tensor, "label": torch.tensor(rec.label, dtype=torch.long), "video_id": rec.pair_id if hasattr(rec, 'pair_id') else rec.video_id}
+        video_id = rec.video_id if hasattr(rec, "video_id") else rec.pair_id
+        sample_id = rec.sample_id if hasattr(rec, "sample_id") else f"{rec.frame_path}::{rec.label}::{video_id}"
+        return {
+            "image": tensor,
+            "label": torch.tensor(rec.label, dtype=torch.long),
+            "video_id": video_id,
+            "image_path": rec.frame_path,
+            "sample_id": sample_id,
+        }
 
 
 def cv2_resize(img, size):

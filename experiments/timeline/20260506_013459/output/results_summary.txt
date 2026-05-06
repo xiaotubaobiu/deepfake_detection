@@ -1,0 +1,8 @@
+Exp: norm_shortcut_normtrain_s999
+Model: clip_finetune
+Best epoch: 11
+Per-GPU batch: 128
+Val:  AUC=0.9979 EER=0.0297 ACC=0.9778
+FF++: AUC=0.9998 EER=0.0061 ACC=0.9956
+CDF:  AUC=0.7797 EER=0.2977 ACC=0.9211
+DFD:  AUC=0.8322 EER=0.2722 ACC=0.6013

@@ -2,6 +2,8 @@ __pycache__/
 *.pyc
 *.pyo
 outputs/
+experiments/outputs/
 .pytest_cache/
 *.egg-info/
 logs/
+experiments/logs/

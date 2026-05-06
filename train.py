@@ -21,11 +21,24 @@ from deepfake_detection.models.factory import build_model
 from deepfake_detection.data.builders import build_train_loader, build_eval_loader, build_val_loader
 
 
+def _resolve_config_path(path, config_path=None):
+    candidates = [path]
+    if config_path is not None:
+        candidates.append(os.path.join(os.path.dirname(config_path), path))
+    if path.startswith("configs/"):
+        candidates.append(os.path.join("experiments", path))
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return path
+
+
 def load_config(path):
-    with open(path) as f:
+    resolved_path = _resolve_config_path(path)
+    with open(resolved_path) as f:
         cfg = yaml.safe_load(f)
     if "_base_" in cfg:
-        base_path = cfg.pop("_base_")
+        base_path = _resolve_config_path(cfg.pop("_base_"), resolved_path)
         with open(base_path) as f:
             base = yaml.safe_load(f)
         merged = {**base, **cfg}
@@ -36,7 +49,7 @@ def load_config(path):
     return cfg
 
 
-def setup_experiment_log(exp_name, cfg, output_dir="outputs"):
+def setup_experiment_log(exp_name, cfg, output_dir="experiments/outputs"):
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = os.path.join(output_dir, exp_name, ts)
     os.makedirs(run_dir, exist_ok=True)
@@ -127,7 +140,7 @@ def main():
     patience = cfg["train"].get("patience", 5)
     warmup_epochs = cfg["train"].get("warmup_epochs", 0)
     ema_decay = cfg["train"].get("ema_decay", 0)
-    output_dir = cfg["train"].get("output_dir", "outputs")
+    output_dir = cfg["train"].get("output_dir", "experiments/outputs")
     seed = cfg["train"].get("seed", 42)
 
     local_rank = init_ddp()
@@ -186,10 +199,11 @@ def main():
     val_loader = build_val_loader(cfg, distributed=torch.distributed.is_initialized())
     ffpp_eval_loader = build_eval_loader(cfg, domain="ffpp", distributed=torch.distributed.is_initialized())
     cdf_eval_loader = build_eval_loader(cfg, domain="cdf", distributed=torch.distributed.is_initialized())
+    dfd_eval_loader = build_eval_loader(cfg, domain="dfd", distributed=torch.distributed.is_initialized())
 
     if logger:
         logger.log(f"Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}, "
-                   f"FF++ test: {len(ffpp_eval_loader.dataset)}, CDF test: {len(cdf_eval_loader.dataset)}")
+                   f"FF++ test: {len(ffpp_eval_loader.dataset)}, CDF test: {len(cdf_eval_loader.dataset)}, DFD test: {len(dfd_eval_loader.dataset)}")
 
     best_auc = 0
     patience_counter = 0
@@ -254,11 +268,13 @@ def main():
     val_final = run_eval_epoch(model, val_loader, device, cfg)
     ffpp_metrics = run_eval_epoch(model, ffpp_eval_loader, device, cfg)
     cdf_metrics = run_eval_epoch(model, cdf_eval_loader, device, cfg)
+    dfd_metrics = run_eval_epoch(model, dfd_eval_loader, device, cfg)
 
     if logger:
         logger.log(f"Val (best): auc={val_final['auc']:.4f} eer={val_final['eer']:.4f} acc={val_final['acc']:.4f}")
         logger.log(f"FF++ test: auc={ffpp_metrics['auc']:.4f} eer={ffpp_metrics['eer']:.4f} acc={ffpp_metrics['acc']:.4f}")
         logger.log(f"CDF test: auc={cdf_metrics['auc']:.4f} eer={cdf_metrics['eer']:.4f} acc={cdf_metrics['acc']:.4f}")
+        logger.log(f"DFD test: auc={dfd_metrics['auc']:.4f} eer={dfd_metrics['eer']:.4f} acc={dfd_metrics['acc']:.4f}")
 
         logger.log(f"Best epoch: {best_epoch}, Best val AUC: {best_auc:.4f}")
 
@@ -278,6 +294,9 @@ def main():
         meta["cdf_test_auc"] = cdf_metrics["auc"]
         meta["cdf_test_eer"] = cdf_metrics["eer"]
         meta["cdf_test_acc"] = cdf_metrics["acc"]
+        meta["dfd_test_auc"] = dfd_metrics["auc"]
+        meta["dfd_test_eer"] = dfd_metrics["eer"]
+        meta["dfd_test_acc"] = dfd_metrics["acc"]
         with open(meta_path, "w") as f:
             json.dump(meta, f, indent=2)
         logger.log(f"Meta saved to {meta_path}")
@@ -291,6 +310,7 @@ def main():
             f.write(f"Val:  AUC={val_final['auc']:.4f} EER={val_final['eer']:.4f} ACC={val_final['acc']:.4f}\n")
             f.write(f"FF++: AUC={ffpp_metrics['auc']:.4f} EER={ffpp_metrics['eer']:.4f} ACC={ffpp_metrics['acc']:.4f}\n")
             f.write(f"CDF:  AUC={cdf_metrics['auc']:.4f} EER={cdf_metrics['eer']:.4f} ACC={cdf_metrics['acc']:.4f}\n")
+            f.write(f"DFD:  AUC={dfd_metrics['auc']:.4f} EER={dfd_metrics['eer']:.4f} ACC={dfd_metrics['acc']:.4f}\n")
         logger.log(f"Results saved to {results_path}")
         logger.close()
 

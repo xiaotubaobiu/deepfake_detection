@@ -1,0 +1,8 @@
+Exp: norm_shortcut_raw_s999
+Model: clip_finetune
+Best epoch: 11
+Per-GPU batch: 128
+Val:  AUC=0.9950 EER=0.0419 ACC=0.9559
+FF++: AUC=0.9998 EER=0.0061 ACC=0.9947
+CDF:  AUC=0.8291 EER=0.2700 ACC=0.9225
+DFD:  AUC=0.8170 EER=0.2841 ACC=0.5838

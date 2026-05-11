@@ -7,3 +7,6 @@ experiments/*/output/best_model.pth
 *.egg-info/
 logs/
 experiments/logs/
+.claude/
+docs/
+tests/

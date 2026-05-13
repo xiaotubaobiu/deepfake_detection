@@ -131,7 +131,7 @@ def run_sample_eval_epoch(model, dataloader, device, cfg, output_dir: str | None
     for batch in dataloader:
         images = batch["image"].to(device, non_blocking=True)
         with torch.amp.autocast("cuda", enabled=False):
-            features = raw_model.visual(images.float()).float()
+            features = raw_model.extract_features(images.float()).float()
             classifier_features = F.normalize(features, dim=-1) if getattr(raw_model, "normalize_features", False) else features
             logits = raw_model.classifier(classifier_features.float())
             prob_fake = torch.softmax(logits, dim=1)[:, 1]

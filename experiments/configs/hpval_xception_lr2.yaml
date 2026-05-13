@@ -1,0 +1,8 @@
+_base_: experiments/configs/xception_base.yaml
+experiment_name: hpval_xception_lr2_s42
+model:
+  name: xception
+  normalize_features: false
+train:
+  lr: 0.0003
+  seed: 42

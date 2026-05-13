@@ -20,8 +20,11 @@ class CLIPFineTuneBinaryClassifier(nn.Module):
         self.classifier = nn.Linear(self.visual.output_dim, 2)
         self.normalize_features = normalize_features
 
+    def extract_features(self, images):
+        return self.visual(images)
+
     def forward(self, images):
-        image_features = self.visual(images)
+        image_features = self.extract_features(images)
         if self.normalize_features:
             image_features = F.normalize(image_features, dim=-1)
         return self.classifier(image_features.float())

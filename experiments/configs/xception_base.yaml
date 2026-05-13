@@ -1,0 +1,22 @@
+_base_: experiments/configs/base.yaml
+
+model:
+  name: xception
+  normalize_features: false
+
+loss:
+  name: cross_entropy
+
+train:
+  per_gpu_batch: 128
+  lr: 0.0001
+  weight_decay: 0.0005
+  epochs: 15
+  ema_decay: 0.999
+  warmup_epochs: 1
+  patience: 5
+
+dataset:
+  train_videos_per_method: 586
+  frames_per_video: 8
+  image_size: 224

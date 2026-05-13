@@ -1,17 +1,15 @@
 from __future__ import annotations
 
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
 
 
-class EfficientNetBinaryClassifier(nn.Module):
+class DINOv2BinaryClassifier(nn.Module):
     def __init__(self, normalize_features: bool = False):
         super().__init__()
-        backbone = efficientnet_b0(weights=EfficientNet_B0_Weights.IMAGENET1K_V1)
-        self.feature_dim = backbone.classifier[1].in_features  # 1280
-        backbone.classifier = nn.Identity()
-        self.backbone = backbone
+        self.backbone = torch.hub.load("facebookresearch/dinov2", "dinov2_vitb14")
+        self.feature_dim = self.backbone.embed_dim  # 768
         self.classifier = nn.Linear(self.feature_dim, 2)
         self.normalize_features = normalize_features
 

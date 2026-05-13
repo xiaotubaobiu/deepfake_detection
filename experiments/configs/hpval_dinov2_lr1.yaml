@@ -1,0 +1,8 @@
+_base_: experiments/configs/dinov2_base.yaml
+experiment_name: hpval_dinov2_lr1_s42
+model:
+  name: dinov2_vitb14
+  normalize_features: false
+train:
+  lr: 0.00001
+  seed: 42

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from deepfake_detection.models.efficientnet import EfficientNetBinaryClassifier
+from deepfake_detection.models.dinov2 import DINOv2BinaryClassifier
+from deepfake_detection.models.xception import XceptionBinaryClassifier
 from deepfake_detection.models.clip_classifier import CLIPFineTuneBinaryClassifier
 from deepfake_detection.models.clip_prompt import CLIPPromptBinaryClassifier
 from deepfake_detection.models.clip_bgcontrast import CLIPBgFaceContrastModel
@@ -10,10 +12,22 @@ def build_model(model_cfg: dict):
     name = model_cfg["name"]
     clip_name = model_cfg.get("clip_model_name", "ViT-B/16")
     if name == "efficientnet_b0":
-        return EfficientNetBinaryClassifier()
+        return EfficientNetBinaryClassifier(
+            normalize_features=model_cfg.get("normalize_features", False),
+        )
+    if name == "dinov2_vitb14":
+        return DINOv2BinaryClassifier(
+            normalize_features=model_cfg.get("normalize_features", False),
+        )
+    if name == "xception":
+        return XceptionBinaryClassifier(
+            normalize_features=model_cfg.get("normalize_features", False),
+        )
     if name == "clip_finetune":
-        normalize_features = model_cfg.get("normalize_features", False)
-        return CLIPFineTuneBinaryClassifier(clip_name, normalize_features)
+        return CLIPFineTuneBinaryClassifier(
+            clip_name,
+            model_cfg.get("normalize_features", False),
+        )
     if name == "clip_prompt":
         tau = model_cfg.get("tau", 0.07)
         freeze_visual = model_cfg.get("freeze_visual", "none")

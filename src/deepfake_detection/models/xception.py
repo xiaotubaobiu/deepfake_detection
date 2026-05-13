@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
+import timm
 
 
-class EfficientNetBinaryClassifier(nn.Module):
+class XceptionBinaryClassifier(nn.Module):
     def __init__(self, normalize_features: bool = False):
         super().__init__()
-        backbone = efficientnet_b0(weights=EfficientNet_B0_Weights.IMAGENET1K_V1)
-        self.feature_dim = backbone.classifier[1].in_features  # 1280
-        backbone.classifier = nn.Identity()
-        self.backbone = backbone
+        self.backbone = timm.create_model("legacy_xception", pretrained=True)
+        self.feature_dim = self.backbone.num_features  # 2048
+        self.backbone.reset_classifier(0)
         self.classifier = nn.Linear(self.feature_dim, 2)
         self.normalize_features = normalize_features
 

@@ -1,0 +1,8 @@
+_base_: experiments/configs/efficientnet_base.yaml
+experiment_name: hpval_efficientnet_lr1_s42
+model:
+  name: efficientnet_b0
+  normalize_features: false
+train:
+  lr: 0.0001
+  seed: 42
